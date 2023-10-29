@@ -1,16 +1,15 @@
 <!DOCTYPE HTML>
 <html>
 <head>
-    <title>SunnyBreeze Sensor</title>
+    <title>SunnyBreeze Monitor</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-
 h1 {font-size: 4rem;}
 h2 {font-size: 2.5rem;}
 h3 {font-size: 1.6rem;}
 p {font-size: 2rem;}
 
-html, body, .background
-{
+html, body, .background{
 	width: 100%;
 	height: 100%;
 	margin: 0;
@@ -23,59 +22,82 @@ html{
 	background: #12022a;
 }
 
-body
-{
+body{
 	background: #eee;
 	background: linear-gradient(0deg, rgba(16, 58, 226, 0.2) , rgba(181, 222, 0, 0) );
 }
-
 
 .container
 {
     align-items: center;
   	justify-content: center;
     margin: auto;
-	padding: 1rem;
-	height: 95%;
+	  padding: 1rem;
+	  height: min(95vh, 95vw);
     width: 95%;
-	overflow: auto;
+	  overflow: auto;
 
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
-    grid-template-rows: 2fr 2fr 1fr;
+    grid-template-rows: 1fr 2fr 2fr;
     gap: 0.2rem 0.2rem;
     grid-auto-flow: row;
     grid-template-areas:
     "Ti Ti His"
     "Tem Hum His"
-    "Cr Cr His";
+    "AtmP AirQ His";
 	
 	background: #eee;
 	background: linear-gradient(240deg, rgba(165, 51, 51, 0.3) , rgba(240, 205, 7, 0) );
 }
 
 .Tem { grid-area: Tem; }
-
 .His { grid-area: His; }
-
 .Hum { grid-area: Hum; }
-
 .Ti { grid-area: Ti;}
+.AtmP { grid-area: AtmP;}
+.AirQ { grid-area: AirQ;}
 
-.Cr { grid-area: Cr; }
+.Tem, .Hum, .Ti, .AtmP, .AirQ {margin: auto; text-align: center;}
 
-.Tem, .Hum, .Ti {margin: auto; text-align: center;}
-
-
-    </style>
+</style>
 </head>
 <body>
 <div class="container">
-    <div class="Tem"><p>Lämpötila</p><h2>%f ℃</h2></div>
     <div class="His"><p></p></div>
-    <div class="Hum"><p>Kosteus</p><h2>%f \%</h2></div>
     <div class="Ti"><h1>Sunny Breeze<br><h2>weather monitor</h2></h1></div>
-    <div class="Cr"><h3>2023 - Naervern<br>Antonio Maximiano Mascarenhas Almeida</h3></div>
-</div>
-</body>
-</html>
+    <div class="Hum"><p>Kosteus</p><h2><span id="humf">%HUM%</span> %</h2></div>
+    <div class="Tem"><p>Lämpötila</p><h2><span id="temf">%TEM%</span> ℃</h2></div>
+    <div class="AtmP"><p>Paine</p><p><span id="pressure">--</span> hPa</p></div>
+    <div class="AirQ"><p>Saaste</p><p><span id="pressure">--</span> ppb</p></div>
+  </div>
+  <div class="Cr"><h3>Weather awareness project by Naervern,<br>Antonio Maximiano Mascarenhas Almeida</h3></div>
+<script language="javascript">
+if (!!window.EventSource) {
+  var source = new EventSource('/events');
+  source.addEventListener('open', function(e) {
+    console.log("Events Connected");+-
+  }, false);
+  source.addEventListener('error', function(e) {
+    if (e.target.readyState != EventSource.OPEN) {
+      console.log("Events Disconnected");
+    }
+  }, false);
+
+  source.addEventListener('message', function(e) {
+    console.log("message", e.data);
+  }, false);
+
+  source.addEventListener('temperature', function(e) {
+    console.log("temperature", e.data);
+    document.getElementById("temf").innerHTML = e.data;
+  }, false);
+
+  source.addEventListener('humidity', function(e) {
+    console.log("humidity", e.data);
+    document.getElementById("humf").innerHTML = e.data;
+  }, false);
+}
+</script>
+      
+</body></html>
