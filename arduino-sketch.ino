@@ -16,8 +16,8 @@ AsyncEventSource events("/events");
 unsigned long lastTime = 0;  
 unsigned long timerDelay = 30000;
 
-unsigned long regtime[] = new unsigned long[52600];
-float regtab[][4] = new float[52600][4];
+unsigned long regtime[52600] = new unsigned long[52600];
+float regtab[52600][4] = new float[52600][4];
 unsigned int step = 0; //iterator for the regtab array. It keeps track of what's the next measurement to be stored.
 
 bool measurement_trigger = false;
@@ -352,7 +352,7 @@ void save_entry(float val0, float val1, float val2, float val3){
   regtab[step][2] = val2;
   regtab[step][3] = val3;
   step++;
-  if(step > 52599){step = 0};
+  if(step > 52599){step = 0};;
 }
 
 
