@@ -352,7 +352,7 @@ void save_entry(float val0, float val1, float val2, float val3){
   regtab[step][2] = val2;
   regtab[step][3] = val3;
   step++;
-  if(step > 52599){step = 0};;
+  if(step > 52599){step = 0;};
 }
 
 
