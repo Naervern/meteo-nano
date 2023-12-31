@@ -10,7 +10,6 @@ p {font-size: 2rem;}
 
 html, body, .background{
 	width: 100vw;
-	height: 100vh;
 	margin: 0;
 	padding: 0;
 	font-family: 'Roboto', 'Palatino', 'Lucida Sans Unicode', sans-serif;
@@ -32,10 +31,10 @@ a:hover{ color: #bb5;}
   	justify-content: center;
     text-align: center;
     margin: auto;
-	  padding: 1rem;
-	  height: min(95vh, 95vw);
-    width: 95vw;
-	  overflow: auto;
+	padding: 1rem;
+    width: 98vw;
+    height: 95vh;
+	overflow: auto;
     font-size: 2.5rem;
 
     display: grid;
@@ -52,14 +51,6 @@ a:hover{ color: #bb5;}
 	background: linear-gradient(240deg, rgba(165, 51, 51, 0.3) , rgba(240, 205, 7, 0)  );
 }
 
-.Tem { grid-area: Te; }
-.His { grid-area: Hi; min-width: 40%;}
-.Hum { grid-area: Hu; }
-.Ti { grid-area: Ti;}
-.AtmP { grid-area: At;}
-.AirQ { grid-area: Ai;}
-.Cr { grid-area: Cr;}
-
 .half {
 padding: 10px;
 }
@@ -68,10 +59,73 @@ padding: 10px;
 content: "";    
 clear: both;
 display: grid;
-grid-template-columns: 20% 4% 19% 4% 19% 17% 17%;
-font-size: 1.6rem;
+grid-template-columns: 20% 3% 20% 3% 20% 17% 17%;
+font-size: 1.8rem;
 align-items: center;
 }
+
+@media only screen and (max-device-width: 1580px){
+    .container{
+        grid-template-columns: 1fr minmax(auto, 2.5fr);
+        grid-template-rows: auto;
+        grid-template-areas:
+        "Ti Ti"
+        "Te Hi"
+        "Hu Hi"
+        "At Hi"
+        "Ai Hi"
+        "Cr Cr";
+        gap: 0.1rem 0.1rem;
+        height: max(70vh, 100vw);
+    }
+    h1 {font-size: 2.5rem;}
+    h2, .container {font-size: 2rem;}
+    h3, .boxed {font-size: 1.5rem;}
+    p {font-size: 1.8rem;}
+    
+    .boxed {
+    content: "";    
+    clear: both;
+    display: grid;
+    grid-template-columns: 20% 3% 20% 3% 20% 17% 17%;
+    }
+    .Hi{height: 100%;}
+}
+
+@media only screen and (max-device-width: 1050px){
+    .container{
+        grid-template-columns: 1fr minmax(auto, 3.5fr);
+        grid-template-rows: auto;
+        grid-template-areas:
+        "Ti Ti"
+        "Te Hi"
+        "Hu Hi"
+        "At Hi"
+        "Ai Hi"
+        "Cr Cr";
+        gap: 0.1rem 0.1rem;
+    }
+    h1 {font-size: 1.8rem;}
+    h2, .container {font-size: 1.5rem;}
+    h3, .boxed {font-size: 1rem;}
+    p {font-size: 1.2rem;}
+    
+    .boxed {
+    content: "";    
+    clear: both;
+    display: grid;
+    grid-template-columns: 20% 3% 20% 3% 20% 17% 17%;
+    }
+    .Hi{height: 100%;}
+}
+
+.Tem { grid-area: Te; }
+.His { grid-area: Hi; min-width: 40%;}
+.Hum { grid-area: Hu; }
+.Ti { grid-area: Ti;}
+.AtmP { grid-area: At;}
+.AirQ { grid-area: Ai;}
+.Cr { grid-area: Cr;}
 
 </style>
 </head>
