@@ -282,12 +282,12 @@ padding: 10px;
 content: "";    
 clear: both;
 display: grid;
-grid-template-columns: 20% 3% 20% 3% 20% 17% 17%;
+grid-template-columns: 20%% 3%% 20%% 3%% 20%% 17%% 17%%;
 font-size: 1.8rem;
 align-items: center;
 }
 
-@media only screen and (max-device-width: 1580px){
+@media (max-device-width: 1580px){
     .container{
         grid-template-columns: 1fr minmax(auto, 2.5fr);
         grid-template-rows: auto;
@@ -310,12 +310,12 @@ align-items: center;
     content: "";    
     clear: both;
     display: grid;
-    grid-template-columns: 20% 3% 20% 3% 20% 17% 17%;
+    grid-template-columns: 20pc 3pc 20pc 3pc 20pc 17pc 17pc;
     }
-    .Hi{height: 100%;}
+    .Hi{height: 100%%;}
 }
 
-@media only screen and (max-device-width: 1050px){
+@media (max-device-width: 1050px){
     .container{
         grid-template-columns: 1fr minmax(auto, 3.5fr);
         grid-template-rows: auto;
@@ -337,13 +337,13 @@ align-items: center;
     content: "";    
     clear: both;
     display: grid;
-    grid-template-columns: 20% 3% 20% 3% 20% 17% 17%;
+    grid-template-columns: 20%% 3%% 20%% 3%% 20%% 17%% 17%%;
     }
-    .Hi{height: 100%;}
+    .Hi{height: 100%%;}
 }
 
 .Tem { grid-area: Te; }
-.His { grid-area: Hi; min-width: 40%;}
+.His { grid-area: Hi; min-width: 40%%;}
 .Hum { grid-area: Hu; }
 .Ti { grid-area: Ti;}
 .AtmP { grid-area: At;}
