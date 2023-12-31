@@ -18,7 +18,10 @@ unsigned long timerDelay = 30000;
 
 //unsigned long regtime[52600] = {0};
 //float regtab[52600][4] = {0.0};
-float * regtab;
+float * regtemp;
+float * reghum;
+float * regpres;
+unsigned int * regpol;
 unsigned long * regtime;
 //ps_malloc();
 int step = 0; //iterator for the regtab array. It keeps track of what's the next measurement to be stored.
@@ -543,10 +546,10 @@ void save_entry(float val0, float val1, float val2, float val3){
 
   // This function saves entries to the next 
 
-  regtab[step][0] = val0;
-  regtab[step][1] = val1;
-  regtab[step][2] = val2;
-  regtab[step][3] = val3;
+  regtemp[step] = val0;
+  reghum[step] = val1;
+  regpres[step] = val2;
+  regpol[step] = val3;
   regtime[step] = millis();
   step++;
   if(step > 52599){step = 0;};
@@ -563,7 +566,10 @@ void setup() {
   setCpuFrequencyMhz(80);
   Serial.begin(115200);
   //while (!Serial) {}; // wait for serial port to connect. Needed for native USB port only, easier debugging :P
-  regtab = (float *) ps_malloc (210400 * sizeof (float));
+  regtemp = (float *) ps_malloc (52600 * sizeof (float));
+  reghum = (float *) ps_malloc (52600 * sizeof (float));
+  regpres = (float *) ps_malloc (52600 * sizeof (float));
+  regpol = (unsigned int *) ps_malloc (52600 * sizeof (unsigned int));
   regtime = (unsigned long *) ps_malloc (52600 * sizeof (unsigned long));
   if(psramInit()){
     Serial.println("\nPSRAM is correctly initialized");
