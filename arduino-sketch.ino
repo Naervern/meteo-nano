@@ -20,8 +20,8 @@ unsigned long timerDelay = 30000;
 //float regtab[52600][4] = {0.0};
 float * regtab;
 unsigned long * regtime;
-//ps_memalloc();
-unsigned int step = 0; //iterator for the regtab array. It keeps track of what's the next measurement to be stored.
+//ps_malloc();
+int step = 0; //iterator for the regtab array. It keeps track of what's the next measurement to be stored.
 
 bool measurement_trigger = false;
 bool midnight_trigger = false;
