@@ -16,9 +16,11 @@ AsyncEventSource events("/events");
 unsigned long lastTime = 0;   
 unsigned long timerDelay = 30000;
 
-unsigned long regtime[52600] = {0};
-float regtab[52600][4] = {0.0};
-ps_memalloc();
+//unsigned long regtime[52600] = {0};
+//float regtab[52600][4] = {0.0};
+float * regtab;
+unsigned long * regtime;
+//ps_memalloc();
 unsigned int step = 0; //iterator for the regtab array. It keeps track of what's the next measurement to be stored.
 
 bool measurement_trigger = false;
@@ -43,6 +45,19 @@ void update_params(){
   Serial.println();
   save_entry(temperature, humidity, pressure, pollution);
 }
+
+int week_it = 0;
+int week_f(int i){
+  if (week_it + i <7){return week_it + i;}
+  else {return week_it+i-7;}
+}
+
+float histtemperaturemax[7] = {0.0};
+float histtemperaturemin[7] = {0.0};
+float histhumiditymax[7] = {0.0};
+float histhumiditymin[7] = {0.0};
+int histpressure[7] = {0};
+int histpollution[7] = {0};
 
 String processor(const String& var){ //Stuff from Rui Santos
   
@@ -199,18 +214,6 @@ const String histfields[7][6] = {
   {"D6TEH", "D6TEL", "D6HUH", "D6HUL", "D6PR", "D6PL"},
 };
 */
-int week_f = 0;
-int week_it(int i){
-  if (week_f + i <7){return week_f + i}
-  else {return week_f+i-7}
-}
-
-float histtemperaturemax[7] = {0.0};
-float histtemperaturemin[7] = {0.0};
-float histhumiditymax[7] = {0.0};
-float histhumiditymin[7] = {0.0};
-int histpressure[7] = {0};
-int histpollution[7] = {0};
 
 
 const char index_html[] PROGMEM = R"rawliteral(
@@ -544,7 +547,7 @@ void save_entry(float val0, float val1, float val2, float val3){
   regtab[step][1] = val1;
   regtab[step][2] = val2;
   regtab[step][3] = val3;
-  regtime[step] = getTime();
+  regtime[step] = millis();
   step++;
   if(step > 52599){step = 0;};
 }
