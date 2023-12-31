@@ -8,19 +8,21 @@
 
 //debug libraries
 #include <Wire.h>
-
+  
 DNSServer dnsServer;
 AsyncWebServer server(80);
 AsyncEventSource events("/events");
 
-unsigned long lastTime = 0;  
+unsigned long lastTime = 0;   
 unsigned long timerDelay = 30000;
 
-unsigned long* regtime[] = {new unsigned long[52600]};
-float regtab[52600][4] = {0};
+unsigned long regtime[52600] = {0};
+float regtab[52600][4] = {0.0};
+ps_memalloc();
 unsigned int step = 0; //iterator for the regtab array. It keeps track of what's the next measurement to be stored.
 
 bool measurement_trigger = false;
+bool midnight_trigger = false;
 bool wifi_on = false;
 
 AHT20 aht20;
@@ -56,8 +58,160 @@ String processor(const String& var){ //Stuff from Rui Santos
     else if(var == "POLU"){
     return String(pollution);
   }
+    else if(var == "D0TEH"){
+    return String(histtemperaturemax[week_f(0)]);
+  }
+    else if(var == "D0TEL"){
+    return String(histtemperaturemin[week_f(0)]);
+  }
+    else if(var == "D0HUH"){
+    return String(histhumiditymax[week_f(0)]);
+  }
+    else if(var == "D0HUL"){
+    return String(histhumiditymin[week_f(0)]);
+  }
+    else if(var == "D0PR"){
+    return String(histpressure[week_f(0)]);
+  } 
+    else if(var == "D0PL"){
+    return String(histpollution[week_f(0)]);
+  }
+    else if(var == "D1TEH"){
+    return String(histtemperaturemax[week_f(1)]);
+  }
+    else if(var == "D1TEL"){
+    return String(histtemperaturemin[week_f(1)]);
+  }
+    else if(var == "D1HUH"){
+    return String(histhumiditymax[week_f(1)]);
+  }
+    else if(var == "D1HUL"){
+    return String(histhumiditymin[week_f(1)]);
+  }
+    else if(var == "D1PR"){
+    return String(histpressure[week_f(1)]);
+  } 
+    else if(var == "D1PL"){
+    return String(histpollution[week_f(1)]);
+  }
+    else if(var == "D2TEH"){
+    return String(histtemperaturemax[week_f(2)]);
+  }
+    else if(var == "D2TEL"){
+    return String(histtemperaturemin[week_f(2)]);
+  }
+    else if(var == "D2HUH"){
+    return String(histhumiditymax[week_f(2)]);
+  }
+    else if(var == "D2HUL"){
+    return String(histhumiditymin[week_f(2)]);
+  }
+    else if(var == "D2PR"){
+    return String(histpressure[week_f(2)]);
+  } 
+    else if(var == "D2PL"){
+    return String(histpollution[week_f(2)]);
+  }
+    else if(var == "D3TEH"){
+    return String(histtemperaturemax[week_f(3)]);
+  }
+    else if(var == "D3TEL"){
+    return String(histtemperaturemin[week_f(3)]);
+  }
+    else if(var == "D3HUH"){
+    return String(histhumiditymax[week_f(3)]);
+  }
+    else if(var == "D3HUL"){
+    return String(histhumiditymin[week_f(3)]);
+  }
+    else if(var == "D3PR"){
+    return String(histpressure[week_f(3)]);
+  } 
+    else if(var == "D3PL"){
+    return String(histpollution[week_f(3)]);
+  }
+    else if(var == "D4TEH"){
+    return String(histtemperaturemax[week_f(4)]);
+  }
+    else if(var == "D4TEL"){
+    return String(histtemperaturemin[week_f(4)]);
+  }
+    else if(var == "D4HUH"){
+    return String(histhumiditymax[week_f(4)]);
+  }
+    else if(var == "D4HUL"){
+    return String(histhumiditymin[week_f(4)]);
+  }
+    else if(var == "D4PR"){
+    return String(histpressure[week_f(4)]);
+  } 
+    else if(var == "D4PL"){
+    return String(histpollution[week_f(4)]);
+  }
+    else if(var == "D5TEH"){
+    return String(histtemperaturemax[week_f(5)]);
+  }
+    else if(var == "D5TEL"){
+    return String(histtemperaturemin[week_f(5)]);
+  }
+    else if(var == "D5HUH"){
+    return String(histhumiditymax[week_f(5)]);
+  }
+    else if(var == "D5HUL"){
+    return String(histhumiditymin[week_f(5)]);
+  }
+    else if(var == "D5PR"){
+    return String(histpressure[week_f(5)]);
+  } 
+    else if(var == "D5PL"){
+    return String(histpollution[week_f(5)]);
+  }
+    else if(var == "D6TEH"){
+    return String(histtemperaturemax[week_f(6)]);
+  }
+    else if(var == "D6TEL"){
+    return String(histtemperaturemin[week_f(6)]);
+  }
+    else if(var == "D6HUH"){
+    return String(histhumiditymax[week_f(6)]);
+  }
+    else if(var == "D6HUL"){
+    return String(histhumiditymin[week_f(6)]);
+  }
+    else if(var == "D6PR"){
+    return String(histpressure[week_f(6)]);
+  } 
+    else if(var == "D6PL"){
+    return String(histpollution[week_f(6)]);
+  }
   return String();
 }
+
+/*
+//if there was a generative method in C++ to use these with the else if functions...
+const String histfields[7][6] = {
+  {"D0TEH", "D0TEL", "D0HUH", "D0HUL", "D0PR", "D0PL"},
+  {"D1TEH", "D1TEL", "D1HUH", "D1HUL", "D1PR", "D1PL"},
+  {"D2TEH", "D2TEL", "D2HUH", "D2HUL", "D2PR", "D2PL"},
+  {"D3TEH", "D3TEL", "D3HUH", "D3HUL", "D3PR", "D3PL"},
+  {"D4TEH", "D4TEL", "D4HUH", "D4HUL", "D4PR", "D4PL"},
+  {"D5TEH", "D5TEL", "D5HUH", "D5HUL", "D5PR", "D5PL"},
+  {"D6TEH", "D6TEL", "D6HUH", "D6HUL", "D6PR", "D6PL"},
+};
+*/
+int week_f = 0;
+int week_it(int i){
+  if (week_f + i <7){return week_f + i}
+  else {return week_f+i-7}
+}
+
+float histtemperaturemax[7] = {0.0};
+float histtemperaturemin[7] = {0.0};
+float histhumiditymax[7] = {0.0};
+float histhumiditymin[7] = {0.0};
+int histpressure[7] = {0};
+int histpollution[7] = {0};
+
 
 const char index_html[] PROGMEM = R"rawliteral(
 
@@ -73,7 +227,6 @@ p {font-size: 2rem;}
 
 html, body, .background{
 	width: 100vw;
-	height: 100vh;
 	margin: 0;
 	padding: 0;
 	font-family: 'Roboto', 'Palatino', 'Lucida Sans Unicode', sans-serif;
@@ -95,14 +248,14 @@ a:hover{ color: #bb5;}
   	justify-content: center;
     text-align: center;
     margin: auto;
-	  padding: 1rem;
-	  height: min(95vh, 95vw);
-    width: 95vw;
-	  overflow: auto;
+	padding: 1rem;
+    width: 98vw;
+    height: 95vh;
+	overflow: auto;
     font-size: 2.5rem;
 
     display: grid;
-    grid-template-columns: 1fr 1fr minmax(auto, 2fr);
+    grid-template-columns: 1fr 1fr minmax(auto, 2.5fr);
     grid-template-rows: 1fr 2fr 2fr 1fr;
     gap: 0.2rem 0.2rem;
     grid-template-areas:
@@ -115,14 +268,6 @@ a:hover{ color: #bb5;}
 	background: linear-gradient(240deg, rgba(165, 51, 51, 0.3) , rgba(240, 205, 7, 0)  );
 }
 
-.Tem { grid-area: Te; }
-.His { grid-area: Hi; min-width: 40%;}
-.Hum { grid-area: Hu; }
-.Ti { grid-area: Ti;}
-.AtmP { grid-area: At;}
-.AirQ { grid-area: Ai;}
-.Cr { grid-area: Cr;}
-
 .half {
 padding: 10px;
 }
@@ -131,10 +276,73 @@ padding: 10px;
 content: "";    
 clear: both;
 display: grid;
-grid-template-columns: 19% 3% 22% 3% 20% 15% 15%;
-font-size: 1.6rem;
+grid-template-columns: 20% 3% 20% 3% 20% 17% 17%;
+font-size: 1.8rem;
 align-items: center;
 }
+
+@media only screen and (max-device-width: 1580px){
+    .container{
+        grid-template-columns: 1fr minmax(auto, 2.5fr);
+        grid-template-rows: auto;
+        grid-template-areas:
+        "Ti Ti"
+        "Te Hi"
+        "Hu Hi"
+        "At Hi"
+        "Ai Hi"
+        "Cr Cr";
+        gap: 0.1rem 0.1rem;
+        height: max(70vh, 100vw);
+    }
+    h1 {font-size: 2.5rem;}
+    h2, .container {font-size: 2rem;}
+    h3, .boxed {font-size: 1.5rem;}
+    p {font-size: 1.8rem;}
+    
+    .boxed {
+    content: "";    
+    clear: both;
+    display: grid;
+    grid-template-columns: 20% 3% 20% 3% 20% 17% 17%;
+    }
+    .Hi{height: 100%;}
+}
+
+@media only screen and (max-device-width: 1050px){
+    .container{
+        grid-template-columns: 1fr minmax(auto, 3.5fr);
+        grid-template-rows: auto;
+        grid-template-areas:
+        "Ti Ti"
+        "Te Hi"
+        "Hu Hi"
+        "At Hi"
+        "Ai Hi"
+        "Cr Cr";
+        gap: 0.1rem 0.1rem;
+    }
+    h1 {font-size: 1.8rem;}
+    h2, .container {font-size: 1.5rem;}
+    h3, .boxed {font-size: 1rem;}
+    p {font-size: 1.2rem;}
+    
+    .boxed {
+    content: "";    
+    clear: both;
+    display: grid;
+    grid-template-columns: 20% 3% 20% 3% 20% 17% 17%;
+    }
+    .Hi{height: 100%;}
+}
+
+.Tem { grid-area: Te; }
+.His { grid-area: Hi; min-width: 40%;}
+.Hum { grid-area: Hu; }
+.Ti { grid-area: Ti;}
+.AtmP { grid-area: At;}
+.AirQ { grid-area: Ai;}
+.Cr { grid-area: Cr;}
 
 </style>
 </head>
@@ -158,76 +366,76 @@ align-items: center;
     <div class="His">
         <div style="display: grid; grid-template-columns: 50% 50%; align-items: center;">
             <div><h2>History</h2></div>
-            <div><a href="">Download all data</a></div>
+            <div><a href="/history">Download all data</a></div>
         </div>
         <div class="boxed">
             <div>Today <br> so far...</div>
             <div> <h2> &#127777;</h2></div>
-            <div class="half">  &#9652; 40.20&deg;C<br> &#9662; -24.10&deg;C</div>
+            <div class="half">  &#9652; %D0TEH%&deg;C<br> &#9662; %D0TEL%&deg;C</div>
             <div> <h2> &#128167;</h2></div>
-            <div>&#9652; 00.00 % <br> &#9662; 00.00 %  </div>
-            <div>0000.0 hPa</div>
-            <div>000000 ppb</div>
+            <div>&#9652; %D0HUH% &percnt; <br> &#9662; %D0HUL% &percnt; </div>
+            <div>%D0PR% hPa</div>
+            <div>%D0PL% ppb</div>
         </div>
         <hr style="border-top: dotted 1px;" />
         <div class="boxed">
             <div>Fri 29/12</div>
             <div> <h2> &#127777;</h2></div>
-            <div class="half">  &#9652; 40.20&deg;C<br> &#9662; -24.10&deg;C</div>
+            <div class="half">  &#9652; %D1TEH%&deg;C<br> &#9662; %D1TEL%&deg;C</div>
             <div> <h2> &#128167;</h2></div>
-            <div>&#9652; 00.00 % <br> &#9662; 00.00 %  </div>
-            <div>0000.0 hPa</div>
-            <div>000000 ppb</div>
+            <div>&#9652; %D1HUH% &percnt; <br> &#9662; %D1HUL% &percnt; </div>
+            <div>%D1PR% hPa</div>
+            <div>%D1PL% ppb</div>
         </div>
         <hr style="border-top: dotted 1px;" />
         <div class="boxed">
             <div>Thu 28/12</div>
             <div> <h2> &#127777;</h2></div>
-            <div class="half">  &#9652; 40.20&deg;C<br> &#9662; -24.10&deg;C</div>
+            <div class="half">  &#9652; %D2TEH%&deg;C<br> &#9662; %D2TEL%&deg;C</div>
             <div> <h2> &#128167;</h2></div>
-            <div>&#9652; 00.00 % <br> &#9662; 00.00 %  </div>
-            <div>0000.0 hPa</div>
-            <div>000000 ppb</div>
+            <div>&#9652; %D2HUH% &percnt; <br> &#9662; %D2HUL% &percnt; </div>
+            <div>%D2PR% hPa</div>
+            <div>%D2PL% ppb</div>
         </div>
         <hr style="border-top: dotted 1px;" />
         <div class="boxed">
             <div>Wed 27/12</div>
             <div> <h2> &#127777;</h2></div>
-            <div class="half">  &#9652; 40.20&deg;C<br> &#9662; -24.10&deg;C</div>
+            <div class="half">  &#9652; %D3TEH%&deg;C<br> &#9662; %D3TEL%&deg;C</div>
             <div> <h2> &#128167;</h2></div>
-            <div>&#9652; 00.00 % <br> &#9662; 00.00 %  </div>
-            <div>0000.0 hPa</div>
-            <div>000000 ppb</div>
+            <div>&#9652; %D3HUH% &percnt; <br> &#9662; %D3HUL% &percnt; </div>
+            <div>%D3PR% hPa</div>
+            <div>%D3PL% ppb</div>
         </div>
         <hr style="border-top: dotted 1px;" />
         <div class="boxed">
             <div>Tue 26/12</div>
             <div> <h2> &#127777;</h2></div>
-            <div class="half">  &#9652; 40.20&deg;C<br> &#9662; -24.10&deg;C</div>
+            <div class="half">  &#9652; %D4TEH%&deg;C<br> &#9662; %D4TEL%&deg;C</div>
             <div> <h2> &#128167;</h2></div>
-            <div>&#9652; 00.00 % <br> &#9662; 00.00 %  </div>
-            <div>0000.0 hPa</div>
-            <div>000000 ppb</div>
+            <div>&#9652; %D4HUH% &percnt; <br> &#9662; %D4HUL% &percnt; </div>
+            <div>%D4PR% hPa</div>
+            <div>%D4PL% ppb</div>
         </div>
         <hr style="border-top: dotted 1px;" />
         <div class="boxed">
             <div>Mon 25/12</div>
             <div> <h2> &#127777;</h2></div>
-            <div class="half">  &#9652; 40.20&deg;C<br> &#9662; -24.10&deg;C</div>
+            <div class="half">  &#9652; %D3TEH%&deg;C<br> &#9662; %D5TEL%&deg;C</div>
             <div> <h2> &#128167;</h2></div>
-            <div>&#9652; 00.00 % <br> &#9662; 00.00 %  </div>
-            <div>0000.0 hPa</div>
-            <div>000000 ppb</div>
+            <div>&#9652; %D5HUH% &percnt; <br> &#9662; %D5HUL% &percnt; </div>
+            <div>%D5PR% hPa</div>
+            <div>%D5PL% ppb</div>
         </div>
         <hr style="border-top: dotted 1px;" />
         <div class="boxed">
             <div>Sun 24/12</div>
             <div> <h2> &#127777;</h2></div>
-            <div class="half">  &#9652; 40.20&deg;C<br> &#9662; -24.10&deg;C</div>
+            <div class="half">  &#9652; %D3TEH%&deg;C<br> &#9662; %D3TEL%&deg;C</div>
             <div> <h2> &#128167;</h2></div>
-            <div>&#9652; 00.00 % <br> &#9662; 00.00 %  </div>
-            <div>0000.0 hPa</div>
-            <div>000000 ppb</div>
+            <div>&#9652; %D6HUH% &percnt; <br> &#9662; %D6HUL% &percnt; </div>
+            <div>%D6PR% hPa</div>
+            <div>%D6PL% ppb</div>
         </div>
     </div>
   </div>
@@ -266,10 +474,6 @@ if (!!window.EventSource) {
  }, false);
 
 };
-
-const svgtemp = document.getElementById("svgtemp");
-document.getElementById("svgtemp").innerHTML= [<path d="M23.476 13.993 16.847 3.437a1.04 1.04 0 0 0-1.694 0L8.494 14.043A9.986 9.986 0 0 0 7 19a9 9 0 0 0 18 0 10.063 10.063 0 0 0-1.524-5.007ZM16 26a7.009 7.009 0 0 1-7-7 7.978 7.978 0 0 1 1.218-3.943l.935-1.49 10.074 10.074A6.977 6.977 0 0 1 16 26.001Z" stroke="white"/><path style="fill:none" d="M0 0h32v32H0z"/></svg>];
-svgtemp.appendChild(<path d="M23.476 13.993 16.847 3.437a1.04 1.04 0 0 0-1.694 0L8.494 14.043A9.986 9.986 0 0 0 7 19a9 9 0 0 0 18 0 10.063 10.063 0 0 0-1.524-5.007ZM16 26a7.009 7.009 0 0 1-7-7 7.978 7.978 0 0 1 1.218-3.943l.935-1.49 10.074 10.074A6.977 6.977 0 0 1 16 26.001Z" stroke="white"/><path style="fill:none" d="M0 0h32v32H0z"/></svg>);
 
 </script>
 </body></html>
@@ -333,17 +537,6 @@ void mode_normal(){
 }
 
 void save_entry(float val0, float val1, float val2, float val3){
-  // works like a pointer now...
-  //for(int i = sizeof(regtab[0][0])-1, i>0, i--){
-  //  for(int j = 0, j < 4, j++){
-  //    regtab[i][j] = regtab[i-1][j];
-  //  };
-  //};
-  //regtab[0][0] = val0;
-  //regtab[0][1] = val1;
-  //regtab[0][2] = val2;
-  //regtab[0][3] = val3;
-  //save_date();
 
   // This function saves entries to the next 
 
@@ -351,11 +544,10 @@ void save_entry(float val0, float val1, float val2, float val3){
   regtab[step][1] = val1;
   regtab[step][2] = val2;
   regtab[step][3] = val3;
+  regtime[step] = getTime();
   step++;
   if(step > 52599){step = 0;};
 }
-
-
 
 void setupServer() {
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -366,10 +558,16 @@ void setupServer() {
 
 void setup() {
   setCpuFrequencyMhz(80);
-
   Serial.begin(115200);
-
   //while (!Serial) {}; // wait for serial port to connect. Needed for native USB port only, easier debugging :P
+  regtab = (float *) ps_malloc (210400 * sizeof (float));
+  regtime = (unsigned long *) ps_malloc (52600 * sizeof (unsigned long));
+  if(psramInit()){
+    Serial.println("\nPSRAM is correctly initialized");
+  }else{
+    Serial.println("PSRAM not available");
+  }
+
   Serial.println();
 
   setenv("TZ", "EET-2EEST,M3.5.0/3,M10.5.0/4", 1); // Timezone set to Helsinki
