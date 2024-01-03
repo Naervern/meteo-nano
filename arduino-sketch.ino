@@ -226,10 +226,10 @@ const char index_html[] PROGMEM = R"rawliteral(
 <head>
     <title>SunnyBreeze Sensor</title>
     <style>
-h1 {font-size: 4rem;}
-h2 {font-size: 2.5rem;}
-h3 {font-size: 1.6rem;}
-p {font-size: 2rem;}
+h1 {font-size: 64;}
+h2 {font-size: 42;}
+h3 {font-size: 28;}
+p {font-size: 36;}
 
 html, body, .background{
 	width: 100vw;
@@ -287,7 +287,7 @@ font-size: 1.8rem;
 align-items: center;
 }
 
-@media (max-device-width: 1580px){
+@media (max-device-width: 1280px){
     .container{
         grid-template-columns: 1fr minmax(auto, 2.5fr);
         grid-template-rows: auto;
@@ -301,37 +301,6 @@ align-items: center;
         gap: 0.1rem 0.1rem;
         height: max(70vh, 100vw);
     }
-    h1 {font-size: 2.5rem;}
-    h2, .container {font-size: 2rem;}
-    h3, .boxed {font-size: 1.5rem;}
-    p {font-size: 1.8rem;}
-    
-    .boxed {
-    content: "";    
-    clear: both;
-    display: grid;
-    grid-template-columns: 20pc 3pc 20pc 3pc 20pc 17pc 17pc;
-    }
-    .Hi{height: 100%%;}
-}
-
-@media (max-device-width: 1050px){
-    .container{
-        grid-template-columns: 1fr minmax(auto, 3.5fr);
-        grid-template-rows: auto;
-        grid-template-areas:
-        "Ti Ti"
-        "Te Hi"
-        "Hu Hi"
-        "At Hi"
-        "Ai Hi"
-        "Cr Cr";
-        gap: 0.1rem 0.1rem;
-    }
-    h1 {font-size: 1.8rem;}
-    h2, .container {font-size: 1.5rem;}
-    h3, .boxed {font-size: 1rem;}
-    p {font-size: 1.2rem;}
     
     .boxed {
     content: "";    
@@ -340,6 +309,22 @@ align-items: center;
     grid-template-columns: 20%% 3%% 20%% 3%% 20%% 17%% 17%%;
     }
     .Hi{height: 100%%;}
+}
+
+@media (max-device-width: 1050px){
+    .container{grid-template-columns: 1fr minmax(auto, 3.5fr);}
+    h1 {font-size: 48;}
+    h2, .container {font-size: 36;}
+    h3, .boxed {font-size: 24;}
+    p {font-size: 32;}
+   
+}
+
+@media (max-device-width: 800px){
+    h1 {font-size: 40;}
+    h2, .container {font-size: 28;}
+    h3, .boxed {font-size: 24;}
+    p {font-size: 20;}
 }
 
 .Tem { grid-area: Te; }
@@ -358,7 +343,7 @@ align-items: center;
     <div class="Ti"><h1>Sunny Breeze<br><h2>weather monitor</h2></h1></div>
     <div class="Hum">
         <svg width="5rem" height="10rem" viewBox="0 0 32 32" fill="white"><path d="M23.476 13.993 16.847 3.437a1.04 1.04 0 0 0-1.694 0L8.494 14.043A9.986 9.986 0 0 0 7 19a9 9 0 0 0 18 0 10.063 10.063 0 0 0-1.524-5.007ZM16 26a7.009 7.009 0 0 1-7-7 7.978 7.978 0 0 1 1.218-3.943l.935-1.49 10.074 10.074A6.977 6.977 0 0 1 16 26.001Z" stroke="white"/><path style="fill:none" d="M0 0h32v32H0z"/></svg>
-        <br><span id="humf">%HUM%</span> &percnt;</div>
+        <br><span id="humf">%HUM%</span> &#37;</div>
     <div class="Tem">
         <svg width="5rem" height="10rem" viewBox="0 0 56 56" fill="white"><path d="M25.012 54.04c6.75 0 12.234-5.485 12.234-12.235 0-3.563-1.476-6.68-4.266-9.211-.515-.469-.632-.727-.632-1.43l.047-21.047c0-4.898-2.977-8.156-7.383-8.156-4.43 0-7.407 3.258-7.407 8.156l.024 21.047c0 .703-.117.961-.61 1.43-2.812 2.531-4.265 5.648-4.265 9.21 0 6.75 5.46 12.235 12.258 12.235Zm0-3.4c-4.875 0-8.836-3.984-8.836-8.835 0-2.93 1.383-5.578 3.867-7.242.727-.493 1.008-.938 1.008-1.899V10.258c0-2.953 1.617-4.852 3.96-4.852 2.321 0 3.915 1.899 3.915 4.852v22.406c0 .961.281 1.406 1.008 1.898 2.484 1.665 3.867 4.313 3.867 7.243 0 4.851-3.938 8.836-8.79 8.836Zm11.742-40.078h5.11a1.35 1.35 0 0 0 1.382-1.359 1.35 1.35 0 0 0-1.383-1.36h-5.11a1.35 1.35 0 0 0-1.382 1.36c0 .727.563 1.36 1.383 1.36Zm0 6.586h5.11a1.35 1.35 0 0 0 1.382-1.359 1.35 1.35 0 0 0-1.383-1.36h-5.11a1.35 1.35 0 0 0-1.382 1.36c0 .727.563 1.36 1.383 1.36ZM24.988 47.477a5.667 5.667 0 0 0 5.672-5.696c0-2.203-1.242-4.008-3.047-4.992-.75-.398-1.008-.68-1.008-1.828V22.516c0-1.22-.703-1.946-1.617-1.946-.89 0-1.617.727-1.617 1.946V34.96c0 1.148-.258 1.43-1.008 1.828-1.804.984-3.047 2.79-3.047 4.992a5.667 5.667 0 0 0 5.672 5.696Zm11.766-23.743h5.11a1.35 1.35 0 0 0 1.382-1.359 1.37 1.37 0 0 0-1.383-1.383h-5.11a1.37 1.37 0 0 0-1.382 1.383c0 .727.563 1.36 1.383 1.36Zm0 6.586h5.11a1.37 1.37 0 0 0 1.382-1.383 1.35 1.35 0 0 0-1.383-1.359h-5.11a1.35 1.35 0 0 0-1.382 1.36 1.37 1.37 0 0 0 1.383 1.382Z" stroke="white"/></svg>
         <br><span id="temf">%TEM%</span> &deg;C</div>
@@ -379,7 +364,7 @@ align-items: center;
             <div> <h2> &#127777;</h2></div>
             <div class="half">  &#9652; %D0TEH%&deg;C<br> &#9662; %D0TEL%&deg;C</div>
             <div> <h2> &#128167;</h2></div>
-            <div>&#9652; %D0HUH% &percnt; <br> &#9662; %D0HUL% &percnt; </div>
+            <div>&#9652; %D0HUH% &#37; <br> &#9662; %D0HUL% &#37; </div>
             <div>%D0PR% hPa</div>
             <div>%D0PL% ppb</div>
         </div>
@@ -389,7 +374,7 @@ align-items: center;
             <div> <h2> &#127777;</h2></div>
             <div class="half">  &#9652; %D1TEH%&deg;C<br> &#9662; %D1TEL%&deg;C</div>
             <div> <h2> &#128167;</h2></div>
-            <div>&#9652; %D1HUH% &percnt; <br> &#9662; %D1HUL% &percnt; </div>
+            <div>&#9652; %D1HUH% &#37; <br> &#9662; %D1HUL% &#37; </div>
             <div>%D1PR% hPa</div>
             <div>%D1PL% ppb</div>
         </div>
@@ -399,7 +384,7 @@ align-items: center;
             <div> <h2> &#127777;</h2></div>
             <div class="half">  &#9652; %D2TEH%&deg;C<br> &#9662; %D2TEL%&deg;C</div>
             <div> <h2> &#128167;</h2></div>
-            <div>&#9652; %D2HUH% &percnt; <br> &#9662; %D2HUL% &percnt; </div>
+            <div>&#9652; %D2HUH% &#37; <br> &#9662; %D2HUL% &#37; </div>
             <div>%D2PR% hPa</div>
             <div>%D2PL% ppb</div>
         </div>
@@ -409,7 +394,7 @@ align-items: center;
             <div> <h2> &#127777;</h2></div>
             <div class="half">  &#9652; %D3TEH%&deg;C<br> &#9662; %D3TEL%&deg;C</div>
             <div> <h2> &#128167;</h2></div>
-            <div>&#9652; %D3HUH% &percnt; <br> &#9662; %D3HUL% &percnt; </div>
+            <div>&#9652; %D3HUH% &#37; <br> &#9662; %D3HUL% &#37; </div>
             <div>%D3PR% hPa</div>
             <div>%D3PL% ppb</div>
         </div>
@@ -419,7 +404,7 @@ align-items: center;
             <div> <h2> &#127777;</h2></div>
             <div class="half">  &#9652; %D4TEH%&deg;C<br> &#9662; %D4TEL%&deg;C</div>
             <div> <h2> &#128167;</h2></div>
-            <div>&#9652; %D4HUH% &percnt; <br> &#9662; %D4HUL% &percnt; </div>
+            <div>&#9652; %D4HUH% &#37; <br> &#9662; %D4HUL% &#37; </div>
             <div>%D4PR% hPa</div>
             <div>%D4PL% ppb</div>
         </div>
@@ -429,7 +414,7 @@ align-items: center;
             <div> <h2> &#127777;</h2></div>
             <div class="half">  &#9652; %D3TEH%&deg;C<br> &#9662; %D5TEL%&deg;C</div>
             <div> <h2> &#128167;</h2></div>
-            <div>&#9652; %D5HUH% &percnt; <br> &#9662; %D5HUL% &percnt; </div>
+            <div>&#9652; %D5HUH% &#37; <br> &#9662; %D5HUL% &#37; </div>
             <div>%D5PR% hPa</div>
             <div>%D5PL% ppb</div>
         </div>
@@ -439,7 +424,7 @@ align-items: center;
             <div> <h2> &#127777;</h2></div>
             <div class="half">  &#9652; %D3TEH%&deg;C<br> &#9662; %D3TEL%&deg;C</div>
             <div> <h2> &#128167;</h2></div>
-            <div>&#9652; %D6HUH% &percnt; <br> &#9662; %D6HUL% &percnt; </div>
+            <div>&#9652; %D6HUH% &#37; <br> &#9662; %D6HUL% &#37; </div>
             <div>%D6PR% hPa</div>
             <div>%D6PL% ppb</div>
         </div>
