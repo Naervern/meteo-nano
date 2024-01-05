@@ -112,12 +112,16 @@
     .AirQ { grid-area: Ai;}
     .Cr { grid-area: Cr;}
     
+    hr{
+        border-top: dotted 1px;
+    }
+
     </style>
 </head>
 <body>
 <div class="container">
     <div class="His"><p></p></div>
-    <div class="Ti"><h1>Sunny Breeze<br><h2>weather monitor</h2></h1></div>
+    <div class="Ti"><h1>Sunny Breeze<br></h1><h2>weather monitor</h2></div>
     <div class="Hum">
         <svg width="5rem" height="10rem" viewBox="0 0 32 32" fill="white"><path d="M23.476 13.993 16.847 3.437a1.04 1.04 0 0 0-1.694 0L8.494 14.043A9.986 9.986 0 0 0 7 19a9 9 0 0 0 18 0 10.063 10.063 0 0 0-1.524-5.007ZM16 26a7.009 7.009 0 0 1-7-7 7.978 7.978 0 0 1 1.218-3.943l.935-1.49 10.074 10.074A6.977 6.977 0 0 1 16 26.001Z" stroke="white"/><path style="fill:none" d="M0 0h32v32H0z"/></svg>
         <br><span id="humf">%HUM%</span> &#37;</div>
@@ -131,7 +135,7 @@
         <svg width="5rem" height="10rem" viewBox="0 0 32 32" fill="white"><path d="M8 5a6 6 0 1 0 0 12h7.023c.913 1.208 2.347 2 3.977 2s3.065-.792 3.977-2H25.5a4.5 4.5 0 0 0 0-9c-.904 0-1.742.271-2.447.73A5.999 5.999 0 0 0 17.5 5c-1.936 0-3.653.92-4.75 2.344A5.984 5.984 0 0 0 8 5zM5 21v2h25v-2H5zm-3 4v2h7v-2H2zm9 0v2h16v-2H11z"/></svg>
         <br><span id="polf">%POLU%</span> ppb</div>
     <div class="Cr"><br><h3>Weather awareness project by Naervern,<br>Antonio Maximiano Mascarenhas Almeida</h3></div>
-    <div class="His">
+    <div class="His" id="hi_S">
     </div>
   </div>
 
@@ -170,18 +174,22 @@ if (!!window.EventSource) {
 };
 
 const wd = %WDAY%;
+//const wd = 3;
 const wk = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const prs = [[%DTEH%],[%DTEL%],[%DHUH%],[%DHUL%],[%DPR%],[%DPL%]];
+//const prs = [[21.50, 22.50, 23.50, 24.50, 25.50, 26.50, 27.50], [21.50, 22.50, 23.50, 24.50, 25.50, 26.50, 27.50], [21.50, 22.50, 23.50, 24.50, 25.50, 26.50, 27.50], [21.50, 22.50, 23.50, 24.50, 25.50, 26.50, 27.50], [21.50, 22.50, 23.50, 24.50, 25.50, 26.50, 27.50], [21.50, 22.50, 23.50, 24.50, 25.50, 26.50, 27.50]];
 
-let hCont = "<div style=\"display: grid; grid-template-columns: 50% 50%; align-items: center;\"><div><h2>History</h2></div><div><a href=\"/history\">Download all data</a></div></div><div>Today<br>so far...</div>";
+let hCont = "<div style=\"display: grid; grid-template-columns: 50% 50%; align-items: center;\"><div><h2>History</h2></div><div><a href=\"/history\">Download all data</a></div></div>";
 for (let i = 0; i < 7; i++) {
   let j = 0;
   if(i+wd >= 7){j = 7;};
-  if(i>0){hCont+="<div>"+wk[wd+i-j]+"</div>"}
- hCont +=   "<div><h2>&#127777;</h2></div><div class=\"half\"> &#9652;"+prs[0][wd+i-j]+"&deg;C<br>&#9662;"+prs[1][wd+i-j]+"&deg;C</div><div><h2>&#128167;</h2></div><div>&#9652;"+prs[2][wd+i-j]+"&#37;<br>&#9662;"+prs[3][wd+i-j]+"&#37; </div><div>"+prs[4][wd+i-j]+" hPa</div><div>"+prs[5][wd+i-j]+"ppb</div>";
+  hCont += "<div class=\"boxed\">";
+  if(i>0){hCont+="<div>"+wk[wd+i-j]+"</div>"};
+  if(i===0){hCont+= "<div>Today<br>so far...</div>"};
+ hCont += "<div><h2>&#127777;</h2></div><div class=\"half\"> &#9652;"+prs[0][wd+i-j]+"&deg;C<br>&#9662;"+prs[1][wd+i-j]+"&deg;C</div><div><h2>&#128167;</h2></div><div>&#9652;"+prs[2][wd+i-j]+"&#37;<br>&#9662;"+prs[3][wd+i-j]+"&#37; </div><div>"+prs[4][wd+i-j]+" hPa</div><div>"+prs[5][wd+i-j]+"ppb</div></div><hr>";
 }
 
-document.getElementsByClassName("His").innerHTML = hCont;
+document.getElementById("hi_S").innerHTML = hCont;
 
 </script>
 </body></html>
