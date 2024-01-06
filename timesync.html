@@ -1,0 +1,25 @@
+<!DOCTYPE HTML>
+<html>
+    <style>
+        html{text-align: center;}
+        button {
+        font-size: 2rem;
+        border-radius: 1vw;
+        padding: 2vw;
+        }
+    </style>
+<h1>Current millis</h1>
+<h2 id="date"></h2><br>
+<button onclick="sendTime()">Sync</button>
+
+<script>
+document.getElementById("date").innerHTML = new Date().getTime();
+function sendTime(){
+    var t = new Date().getTime();
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", "/update?set_millis="+ t);
+    document.getElementById("date").innerHTML = t;
+    xhr.send();
+};
+</script>
+</html>
