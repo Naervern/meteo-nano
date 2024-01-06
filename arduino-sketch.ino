@@ -6,11 +6,13 @@
 #include <time.h>
 #include "AsyncUDP.h"
 #include <SPI.h>
-#include "SparkFun_ENS160.h"
+#include "SparkFun_ENS160.h" //by SparkFun
+#include <Adafruit_BMP280.h>
 
-//debug libraries
 #include <Wire.h>
-  
+
+
+
 DNSServer dnsServer;
 AsyncWebServer server(80);
 AsyncEventSource events("/events");
@@ -39,7 +41,16 @@ float pressure;
 float pollution;
 
 //ENS160 TVOC sensor stuff
-SparkFun_ENS160_SPI myENS; 
+SparkFun_ENS160_SPI ens160;
+
+#define BMP_SCK  (13)
+#define BMP_MISO (12)
+#define BMP_MOSI (11)
+#define BMP_CS   (10)
+
+Adafruit_BMP280 bmp280; // I2C
+//Adafruit_BMP280 bmp(BMP_CS); // hardware SPI
+//Adafruit_BMP280 bmp(BMP_CS, BMP_MOSI, BMP_MISO,  BMP_SCK);
 
 int week_it = 0;
 
@@ -55,7 +66,7 @@ float histtemperaturemin[7] = {0.0};
 float histhumiditymax[7] = {404.0, 404.1, 404.2, 404.3, 404.4, 404.5, 404.6};
 float histhumiditymin[7] = {404.0, 404.1, 404.2, 404.3, 404.4, 404.5, 404.6};
 float histpressure[7] = {1404.0, 1404.1, 1404.2, 1404.3, 1404.4, 1404.5, 1404.6};
-int histpollution[7] = {0};
+unsigned int histpollution[7] = {0};
 
 void save_entry(float val0, float val1, float val2, float val3){
 
@@ -74,8 +85,10 @@ void update_params(){
   //add any sensor measurement here
   temperature = aht20.getTemperature();
   humidity = aht20.getHumidity();
-  pressure = 505.1;
-  pollution = 505.2;
+  pressure = 505.1; //placeholder
+  //pressure = bmp280.readPressure();
+  pollution = 505.2; //placehholder
+  //pollution = ens160.getTVOC();
   Serial.println("New measurement");
   Serial.printf("Temperature = %.2f ℃ \n", temperature);
   Serial.printf("Humidity = %.2f % \n", humidity);
@@ -562,6 +575,30 @@ void setup() {
 
   server.addHandler(new CaptiveRequestHandler()).setFilter(ON_AP_FILTER);  //only when requested from AP
   server.addHandler(&events);
+
+
+  //Setup for the BMP280 sensor
+    unsigned status;
+  //status = bmp280.begin(BMP280_ADDRESS_ALT, BMP280_CHIPID);
+  status = bmp280.begin();
+  if (!status) {
+    Serial.println(F("Could not find a valid BMP280 sensor, check wiring or "
+                      "try a different address!"));
+    Serial.print("SensorID was: 0x"); Serial.println(bmp280.sensorID(),16);
+    Serial.print("        ID of 0xFF probably means a bad address, a BMP 180 or BMP 085\n");
+    Serial.print("   ID of 0x56-0x58 represents a BMP 280,\n");
+    Serial.print("        ID of 0x60 represents a BME 280.\n");
+    Serial.print("        ID of 0x61 represents a BME 680.\n");
+    while (1) delay(10);
+  }
+
+  /* Default settings from datasheet. */
+  bmp280.setSampling(Adafruit_BMP280::MODE_NORMAL,     /* Operating Mode. */
+                  Adafruit_BMP280::SAMPLING_X2,     /* Temp. oversampling */
+                  Adafruit_BMP280::SAMPLING_X16,    /* Pressure oversampling */
+                  Adafruit_BMP280::FILTER_X16,      /* Filtering. */
+                  Adafruit_BMP280::STANDBY_MS_500); /* Standby time. */
+
   
   setupServer();
 
