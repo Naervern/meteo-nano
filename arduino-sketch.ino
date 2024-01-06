@@ -52,9 +52,9 @@ int week_f(int i){
 
 float histtemperaturemax[7] = {0.0};
 float histtemperaturemin[7] = {0.0};
-float histhumiditymax[7] = {0.0};
-float histhumiditymin[7] = {0.0};
-int histpressure[7] = {0};
+float histhumiditymax[7] = {404.0, 404.1, 404.2, 404.3, 404.4, 404.5, 404.6};
+float histhumiditymin[7] = {404.0, 404.1, 404.2, 404.3, 404.4, 404.5, 404.6};
+float histpressure[7] = {1404.0, 1404.1, 1404.2, 1404.3, 1404.4, 1404.5, 1404.6};
 int histpollution[7] = {0};
 
 void save_entry(float val0, float val1, float val2, float val3){
@@ -108,8 +108,8 @@ String processor(const String& var){
       for(float i: histhumiditymax){combined+= String(i, 1) + ",";};
       for(float i: histhumiditymin){combined+= String(i, 1) + ",";};
       for(float i: histpressure){combined+= String(i, 2) + ",";};
-      for(int i = 0; i<6; i++){combined+= String(histpollution[i], 1) + ",";};
-      combined+= String(histpollution[6], 1);
+      for(int i = 0; i<6; i++){combined+= String(histpollution[i]) + ",";};
+      combined+= String(histpollution[6]);
     return combined;
   }
     
@@ -436,16 +436,16 @@ if (!!window.EventSource) {
 
 const wd = %WDAY%;
 const wk = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const prs = [[%DTEH%],[%DTEL%],[%DHUH%],[%DHUL%],[%DPR%],[%DPL%]];
+const prs = [%PARMS%];
 
 let hCont = "<div style=\"display: grid; grid-template-columns: 50%% 50%%; align-items: center;\"><div><h2>History</h2></div><div><a href=\"/history\">Download all data</a></div></div>";
 for (let i = 0; i < 7; i++) {
-  let j = 0;
-  if(wd-i < 0){j = 7;};
-  hCont += "<div class=\"boxed\">";
-  if(i>0){hCont+="<div>"+wk[wd-i+j]+"</div>"};
-  if(i===0){hCont+= "<div>Today<br>so far...</div>"};
- hCont += "<div><h2>&#127777;</h2></div><div class=\"half\">&#9652;"+prs[0][wd-i+j]+"&deg;C<br>&#9662;"+prs[1][wd-i+j]+"&deg;C</div><div><h2>&#128167;</h2></div><div>&#9652;"+prs[2][wd-i+j]+"&#37;<br>&#9662;"+prs[3][wd-i+j]+"&#37;</div><div>"+prs[4][wd-i+j]+" hPa</div><div>"+prs[5][wd-i+j]+"ppb</div></div>";
+ let j = 0;
+ if(wd-i < 0){j = 7;};
+ hCont += "<div class=\"boxed\">";
+ if(i>0){hCont+="<div>"+wk[wd-i+j]+"</div>"};
+ if(i===0){hCont+= "<div>Today<br>so far...</div>"};
+ hCont += "<div><h2>&#127777;</h2></div><div class=\"half\"> &#9652;"+prs[wd-i+j]+"&deg;C<br>&#9662;"+prs[wd-i+j+7]+"&deg;C</div><div><h2>&#128167;</h2></div><div>&#9652;"+prs[wd-i+j+14]+"&#37;<br>&#9662;"+prs[wd-i+j+21]+"&#37; </div><div>"+prs[wd-i+j+28]+" hPa</div><div>"+prs[wd-i+j+35]+"ppb</div></div>";
 if (i<6){hCont+= "<hr>";};
 }
 
