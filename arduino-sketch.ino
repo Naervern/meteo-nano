@@ -468,7 +468,7 @@ document.getElementById("hi_S").innerHTML = hCont;
 
 )rawliteral";
 
-const char settime_html[] = PROGMEM = R"rawliteral(
+const char settime_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE HTML>
 <html>
     <style>
@@ -624,6 +624,7 @@ void setup() {
   //Setup for the BMP280 sensor
     unsigned status;
   //status = bmp280.begin(BMP280_ADDRESS_ALT, BMP280_CHIPID);
+  /* When the BMP280 is around...
   status = bmp280.begin();
   if (!status) {
     Serial.println(F("Could not find a valid BMP280 sensor, check wiring or "
@@ -634,6 +635,7 @@ void setup() {
     Serial.print("        ID of 0x60 represents a BME 280.\n");
     Serial.print("        ID of 0x61 represents a BME 680.\n");
     while (1) delay(10);
+    */
   }
 
   /* Default settings from datasheet. */
