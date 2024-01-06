@@ -571,6 +571,9 @@ void setupServer() {
     }
     request->send_P(200, "text/html", settime_html, processor);
   });
+  server.on("/history", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send_P(200, "text/html", "<html>History goes here</html>", processor);
+  });
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
   request->send_P(200, "text/html", index_html, processor);
   });
