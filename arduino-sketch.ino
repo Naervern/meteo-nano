@@ -107,7 +107,7 @@ String processor(const String& var){
       for(float i: histtemperaturemin){combined+= String(i, 1) + ",";};
       for(float i: histhumiditymax){combined+= String(i, 1) + ",";};
       for(float i: histhumiditymin){combined+= String(i, 1) + ",";};
-      for(float i: histpressure){combined+= String(i, 2) + ",";};
+      for(float i: histpressure){combined+= String(i, 1) + ",";};
       for(int i = 0; i<6; i++){combined+= String(histpollution[i]) + ",";};
       combined+= String(histpollution[6]);
     return combined;
