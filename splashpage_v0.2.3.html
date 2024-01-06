@@ -172,11 +172,11 @@ if (!!window.EventSource) {
  }, false);
 };
 
-//const wd = %WDAY%;
-const wd = 3;
+//const wd = %WDAY%; //remove comment for build
+const wd = 3; //mock value for visualisation
 const wk = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-//const prs = [[%DTEH%],[%DTEL%],[%DHUH%],[%DHUL%],[%DPR%],[%DPL%]];
-const prs = [[21.50, 22.50, 23.50, 24.50, 25.50, 26.50, 27.50], [21.50, 22.50, 23.50, 24.50, 25.50, 26.50, 27.50], [21.50, 22.50, 23.50, 24.50, 25.50, 26.50, 27.50], [21.50, 22.50, 23.50, 24.50, 25.50, 26.50, 27.50], [21.50, 22.50, 23.50, 24.50, 25.50, 26.50, 27.50], [21.50, 22.50, 23.50, 24.50, 25.50, 26.50, 27.50]];
+//const prs = [[%DTEH%],[%DTEL%],[%DHUH%],[%DHUL%],[%DPR%],[%DPL%]]; //remove comment for build
+const prs = [[21.50, 22.50, 23.50, 24.50, 25.50, 26.50, 27.50], [21.50, 22.50, 23.50, 24.50, 25.50, 26.50, 27.50], [21.50, 22.50, 23.50, 24.50, 25.50, 26.50, 27.50], [21.50, 22.50, 23.50, 24.50, 25.50, 26.50, 27.50], [21.50, 22.50, 23.50, 24.50, 25.50, 26.50, 27.50], [21.50, 22.50, 23.50, 24.50, 25.50, 26.50, 27.50]]; //mock value for visualisation
 
 let hCont = "<div style=\"display: grid; grid-template-columns: 50% 50%; align-items: center;\"><div><h2>History</h2></div><div><a href=\"/history\">Download all data</a></div></div>";
 for (let i = 0; i < 7; i++) {
