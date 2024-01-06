@@ -2,15 +2,14 @@
 #include <WiFi.h>
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
-#include <AHT20.h>
 #include <time.h>
 #include "AsyncUDP.h"
 #include <SPI.h>
-#include "SparkFun_ENS160.h" //by SparkFun
+#include <AHT20.h>
+#include "SparkFun_ENS160.h"
 #include <Adafruit_BMP280.h>
 
 #include <Wire.h>
-
 
 
 DNSServer dnsServer;
@@ -78,7 +77,7 @@ void save_entry(float val0, float val1, float val2, float val3){
   regpol[step] = val3;
   regtime[step] = millis();
   step++;
-  if(step > 52599){step = 0;};
+  if(step > 53999){step = 0;};
 }
 
 void update_params(){
@@ -469,6 +468,33 @@ document.getElementById("hi_S").innerHTML = hCont;
 
 )rawliteral";
 
+const char settime_html[] = PROGMEM = R"rawliteral(
+<!DOCTYPE HTML>
+<html>
+    <style>
+        html{text-align: center;}
+        button {
+        font-size: 2rem;
+        border-radius: 1vw;
+        padding: 2vw;
+        }
+    </style>
+<h1>Current millis</h1>
+<h2 id="date"></h2><br>
+<button onclick="sendTime()">Sync</button>
+<script>
+document.getElementById("date").innerHTML = new Date().getTime();
+function sendTime(){
+    var t = new Date().getTime();
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", "/update?set_millis="+ t);
+    document.getElementById("date").innerHTML = t;
+    xhr.send();
+};
+</script>
+</html>
+)rawliteral";
+
 
 class CaptiveRequestHandler : public AsyncWebHandler {
 public:
@@ -497,7 +523,17 @@ public:
 void disableWiFi(){
     WiFi.disconnect(true);  // Disconnect from the network
     WiFi.mode(WIFI_OFF);    // Switch WiFi off
+}
 
+unsigned long acquiredTime = 0;
+unsigned long previousTime = 0;
+void update_time(){
+  for(int i = 0; i < 54000; i++){
+    regtime[i]-= previousTime;
+    regtime[i]+= acquiredTime;
+  };
+  setTime(acquiredTime);
+  previousTime = acquiredTime;
 }
 
 void schedule_time(){
@@ -529,6 +565,14 @@ void setupServer() {
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send_P(200, "text/html", index_html, processor);
     Serial.println("Client Connected");
+    if (request->hasParam("settime")) {
+       request->send_P(200, "text/html", settime_html, processor);
+    }
+    if (request->hasParam("set_millis=")) {
+      acquiredTime = (unsigned long)request->getParam("set_millis=")->value();
+      update_time();
+      Serial.printf("Millis received: %lu \n", acquiredTime);
+    }
   });
 }
 
@@ -536,11 +580,11 @@ void setup() {
   setCpuFrequencyMhz(80);
   Serial.begin(115200);
   //while (!Serial) {}; // wait for serial port to connect. Needed for native USB port only, easier debugging :P
-  regtemp = (float *) ps_malloc (52600 * sizeof (float));
-  reghum = (float *) ps_malloc (52600 * sizeof (float));
-  regpres = (float *) ps_malloc (52600 * sizeof (float));
-  regpol = (unsigned int *) ps_malloc (52600 * sizeof (unsigned int));
-  regtime = (unsigned long *) ps_malloc (52600 * sizeof (unsigned long));
+  regtemp = (float *) ps_malloc (54000 * sizeof (float));
+  reghum = (float *) ps_malloc (54000 * sizeof (float));
+  regpres = (float *) ps_malloc (54000 * sizeof (float));
+  regpol = (unsigned int *) ps_malloc (54000 * sizeof (unsigned int));
+  regtime = (unsigned long *) ps_malloc (54000 * sizeof (unsigned long));
   if(psramInit()){
     Serial.println("\nPSRAM is correctly initialized");
   }else{
