@@ -172,20 +172,18 @@ if (!!window.EventSource) {
  }, false);
 };
 
-//const wd = %WDAY%; //remove comment for build
-const wd = 3; //mock value for visualisation
+const wd = %WDAY%;
 const wk = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-//const prs = [[%DTEH%],[%DTEL%],[%DHUH%],[%DHUL%],[%DPR%],[%DPL%]]; //remove comment for build
-const prs = [[21.50, 22.50, 23.50, 24.50, 25.50, 26.50, 27.50], [21.50, 22.50, 23.50, 24.50, 25.50, 26.50, 27.50], [21.50, 22.50, 23.50, 24.50, 25.50, 26.50, 27.50], [21.50, 22.50, 23.50, 24.50, 25.50, 26.50, 27.50], [21.50, 22.50, 23.50, 24.50, 25.50, 26.50, 27.50], [21.50, 22.50, 23.50, 24.50, 25.50, 26.50, 27.50]]; //mock value for visualisation
+const prs = [%PARMS%];
 
 let hCont = "<div style=\"display: grid; grid-template-columns: 50% 50%; align-items: center;\"><div><h2>History</h2></div><div><a href=\"/history\">Download all data</a></div></div>";
 for (let i = 0; i < 7; i++) {
-  let j = 0;
-  if(wd-i < 0){j = 7;};
-  hCont += "<div class=\"boxed\">";
-  if(i>0){hCont+="<div>"+wk[wd-i+j]+"</div>"};
-  if(i===0){hCont+= "<div>Today<br>so far...</div>"};
- hCont += "<div><h2>&#127777;</h2></div><div class=\"half\"> &#9652;"+prs[0][wd-i+j]+"&deg;C<br>&#9662;"+prs[1][wd-i+j]+"&deg;C</div><div><h2>&#128167;</h2></div><div>&#9652;"+prs[2][wd-i+j]+"&#37;<br>&#9662;"+prs[3][wd-i+j]+"&#37; </div><div>"+prs[4][wd-i+j]+" hPa</div><div>"+prs[5][wd-i+j]+"ppb</div></div>";
+    let j = 0;
+    if(wd-i < 0){j = 7;};
+    hCont += "<div class=\"boxed\">";
+    if(i>0){hCont+="<div>"+wk[wd-i+j]+"</div>"};
+    if(i===0){hCont+= "<div>Today<br>so far...</div>"};
+    hCont += "<div><h2>&#127777;</h2></div><div class=\"half\"> &#9652;"+prs[wd-i+j]+"&deg;C<br>&#9662;"+prs[wd-i+j+7]+"&deg;C</div><div><h2>&#128167;</h2></div><div>&#9652;"+prs[wd-i+j+14]+"&#37;<br>&#9662;"+prs[wd-i+j+21]+"&#37; </div><div>"+prs[wd-i+j+28]+" hPa</div><div>"+prs[wd-i+j+35]+"ppb</div></div>";
 if (i<6){hCont+= "<hr>";};
 }
 
