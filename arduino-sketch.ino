@@ -41,6 +41,35 @@ float pollution;
 //ENS160 TVOC sensor stuff
 SparkFun_ENS160_SPI myENS; 
 
+int week_it = 0;
+
+/*
+int week_f(int i){
+  if (week_it + i <7){return week_it + i;}
+  else {return week_it+i-7;}
+}
+*/
+
+float histtemperaturemax[7] = {0.0};
+float histtemperaturemin[7] = {0.0};
+float histhumiditymax[7] = {0.0};
+float histhumiditymin[7] = {0.0};
+int histpressure[7] = {0};
+int histpollution[7] = {0};
+
+void save_entry(float val0, float val1, float val2, float val3){
+
+  // This function saves entries to the next 
+
+  regtemp[step] = val0;
+  reghum[step] = val1;
+  regpres[step] = val2;
+  regpol[step] = val3;
+  regtime[step] = millis();
+  step++;
+  if(step > 52599){step = 0;};
+}
+
 void update_params(){
   //add any sensor measurement here
   temperature = aht20.getTemperature();
@@ -53,19 +82,6 @@ void update_params(){
   Serial.println();
   save_entry(temperature, humidity, pressure, pollution);
 }
-
-int week_it = 0;
-int week_f(int i){
-  if (week_it + i <7){return week_it + i;}
-  else {return week_it+i-7;}
-}
-
-float histtemperaturemax[7] = {0.0};
-float histtemperaturemin[7] = {0.0};
-float histhumiditymax[7] = {0.0};
-float histhumiditymin[7] = {0.0};
-int histpressure[7] = {0};
-int histpollution[7] = {0};
 
 String processor(const String& var){
   
@@ -81,6 +97,23 @@ String processor(const String& var){
     else if(var == "POLU"){
     return String(pollution);
   }
+    else if(var == "WDAY"){
+    return String(week_it);
+  }
+
+    else if(var == "PARMS"){ //parameters order = max temperature, min temperature, max humidity, min humidity, average pressure, max pollution.
+      String combined = "";
+      for(float i: histtemperaturemax){combined+= String(i, 1) + ",";};
+      for(float i: histtemperaturemin){combined+= String(i, 1) + ",";};
+      for(float i: histhumiditymax){combined+= String(i, 1) + ",";};
+      for(float i: histhumiditymin){combined+= String(i, 1) + ",";};
+      for(float i: histpressure){combined+= String(i, 2) + ",";};
+      for(int i = 0; i<6; i++){combined+= String(histpollution[i], 1) + ",";};
+      combined+= String(histpollution[6], 1);
+    return combined;
+  }
+    
+  /*
     else if(var == "D0TEH"){
     return String(histtemperaturemax[week_f(0)]);
   }
@@ -206,7 +239,8 @@ String processor(const String& var){
   } 
     else if(var == "D6PL"){
     return String(histpollution[week_f(6)]);
-  }
+  }*/
+
   return String();
 }
 
@@ -404,14 +438,14 @@ const wd = %WDAY%;
 const wk = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const prs = [[%DTEH%],[%DTEL%],[%DHUH%],[%DHUL%],[%DPR%],[%DPL%]];
 
-let hCont = "<div style=\"display: grid; grid-template-columns: 50% 50%; align-items: center;\"><div><h2>History</h2></div><div><a href=\"/history\">Download all data</a></div></div>";
+let hCont = "<div style=\"display: grid; grid-template-columns: 50%% 50%%; align-items: center;\"><div><h2>History</h2></div><div><a href=\"/history\">Download all data</a></div></div>";
 for (let i = 0; i < 7; i++) {
   let j = 0;
   if(wd-i < 0){j = 7;};
   hCont += "<div class=\"boxed\">";
   if(i>0){hCont+="<div>"+wk[wd-i+j]+"</div>"};
   if(i===0){hCont+= "<div>Today<br>so far...</div>"};
- hCont += "<div><h2>&#127777;</h2></div><div class=\"half\"> &#9652;"+prs[0][wd-i+j]+"&deg;C<br>&#9662;"+prs[1][wd-i+j]+"&deg;C</div><div><h2>&#128167;</h2></div><div>&#9652;"+prs[2][wd-i+j]+"&#37;<br>&#9662;"+prs[3][wd-i+j]+"&#37; </div><div>"+prs[4][wd-i+j]+" hPa</div><div>"+prs[5][wd-i+j]+"ppb</div></div>";
+ hCont += "<div><h2>&#127777;</h2></div><div class=\"half\">&#9652;"+prs[0][wd-i+j]+"&deg;C<br>&#9662;"+prs[1][wd-i+j]+"&deg;C</div><div><h2>&#128167;</h2></div><div>&#9652;"+prs[2][wd-i+j]+"&#37;<br>&#9662;"+prs[3][wd-i+j]+"&#37;</div><div>"+prs[4][wd-i+j]+" hPa</div><div>"+prs[5][wd-i+j]+"ppb</div></div>";
 if (i<6){hCont+= "<hr>";};
 }
 
@@ -476,19 +510,6 @@ void mode_normal(){
 
   dnsServer.processNextRequest();
   //events.send(String(pressure).c_str(),"pressure",millis());
-}
-
-void save_entry(float val0, float val1, float val2, float val3){
-
-  // This function saves entries to the next 
-
-  regtemp[step] = val0;
-  reghum[step] = val1;
-  regpres[step] = val2;
-  regpol[step] = val3;
-  regtime[step] = millis();
-  step++;
-  if(step > 52599){step = 0;};
 }
 
 void setupServer() {
