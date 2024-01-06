@@ -487,7 +487,7 @@ document.getElementById("date").innerHTML = new Date().getTime();
 function sendTime(){
     var t = new Date().getTime();
     var xhr = new XMLHttpRequest();
-    xhr.open("GET", "/update?set_millis="+ t);
+    xhr.open("GET", "/time?set_millis="+ t);
     document.getElementById("date").innerHTML = t;
     xhr.send();
 };
@@ -562,17 +562,17 @@ void mode_normal(){
 }
 
 void setupServer() {
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send_P(200, "text/html", index_html, processor);
-    Serial.println("Client Connected");
-    if (request->hasParam("settime")) {
-       request->send_P(200, "text/html", settime_html, processor);
-    }
+  server.on("/time", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send_P(200, "text/html", settime_html, processor);
     if (request->hasParam("set_millis=")) {
-      acquiredTime = request->getParam("set_millis=")->(unsigned long)value();
+      acquiredTime = request->getParam("set_millis=")->value().toInt();
       update_time();
       Serial.printf("Millis received: %lu \n", acquiredTime);
     }
+    request->send_P(200, "text/html", settime_html, processor);
+  });
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
+  request->send_P(200, "text/html", index_html, processor);
   });
 }
 
