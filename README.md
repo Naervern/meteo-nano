@@ -1,5 +1,5 @@
 # Sunny Breeze
-A tiny solar-powered esp32-s2 weather station with wifi capture portal access
+A tiny solar-powered esp32-s2 weather station with wifi capture portal access, capable of logging and displaying instantaneous measurements of temperature, relative humidity, atmospheric pressure and total volatile organic compounds (TVOC).
 
 
 Current dependencies:
@@ -7,11 +7,12 @@ Current dependencies:
 - DNSServer.h
 - WiFi.h
 - AsyncTCP.h
-- AHT20.h
 - Time.h
 - Wire.h
 - SPI.h
+- AHT20.h
 - SparkFun_ENS160.h
+- Adafruit_BMP280.h
 
 Features:
 - Solar charging, supercapacitor operation
