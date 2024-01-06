@@ -525,6 +525,7 @@ void disableWiFi(){
     WiFi.mode(WIFI_OFF);    // Switch WiFi off
 }
 
+struct timeval tv;
 unsigned long acquiredTime = 0;
 unsigned long previousTime = 0;
 void update_time(){
@@ -532,8 +533,7 @@ void update_time(){
     regtime[i]-= previousTime;
     regtime[i]+= acquiredTime;
   };
-  setTime(acquiredTime);
-  previousTime = acquiredTime;
+  tv.tv_sec = acquiredTime/1000;
 }
 
 void schedule_time(){
@@ -569,7 +569,7 @@ void setupServer() {
        request->send_P(200, "text/html", settime_html, processor);
     }
     if (request->hasParam("set_millis=")) {
-      acquiredTime = (unsigned long)request->getParam("set_millis=")->value();
+      acquiredTime = request->getParam("set_millis=")->(unsigned long)value();
       update_time();
       Serial.printf("Millis received: %lu \n", acquiredTime);
     }
@@ -635,16 +635,16 @@ void setup() {
     Serial.print("        ID of 0x60 represents a BME 280.\n");
     Serial.print("        ID of 0x61 represents a BME 680.\n");
     while (1) delay(10);
-    */
   }
-
+    */
+  
   /* Default settings from datasheet. */
-  bmp280.setSampling(Adafruit_BMP280::MODE_NORMAL,     /* Operating Mode. */
-                  Adafruit_BMP280::SAMPLING_X2,     /* Temp. oversampling */
-                  Adafruit_BMP280::SAMPLING_X16,    /* Pressure oversampling */
-                  Adafruit_BMP280::FILTER_X16,      /* Filtering. */
-                  Adafruit_BMP280::STANDBY_MS_500); /* Standby time. */
-
+  //bmp280.setSampling(Adafruit_BMP280::MODE_NORMAL,     /* Operating Mode. */
+  //                Adafruit_BMP280::SAMPLING_X2,     /* Temp. oversampling */
+  //                Adafruit_BMP280::SAMPLING_X16,    /* Pressure oversampling */
+  //                Adafruit_BMP280::FILTER_X16,      /* Filtering. */
+  //                Adafruit_BMP280::STANDBY_MS_500); /* Standby time. */
+  
   
   setupServer();
 
