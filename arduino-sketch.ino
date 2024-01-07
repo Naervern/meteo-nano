@@ -499,7 +499,16 @@ function sendTime(){
 
 class CaptiveRequestHandler : public AsyncWebHandler {
 public:
-  CaptiveRequestHandler() {}
+  CaptiveRequestHandler() {
+
+server.on("/time.html", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send_P(200, "text/html", settime_html);});
+
+server.on("/history.html", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send_P(200, "text/html", "<html>History goes here</html>");});
+
+
+}
   virtual ~CaptiveRequestHandler() {}
 
 
