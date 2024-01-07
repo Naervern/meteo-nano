@@ -14,6 +14,8 @@
 
 DNSServer dnsServer;
 AsyncWebServer server(80);
+AsyncWebServer timeserver(80);
+AsyncWebServer historyserver(80);
 AsyncEventSource events("/events");
 
 unsigned long lastTime = 0;   
@@ -450,7 +452,7 @@ const wd = %WDAY%;
 const wk = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const prs = [%PARMS%];
 
-let hCont = "<div style=\"display: grid; grid-template-columns: 50%% 50%%; align-items: center;\"><div><h2>History</h2></div><div><a href=\"/history\">Download all data</a></div></div>";
+let hCont = "<div style=\"display: grid; grid-template-columns: 50%% 50%%; align-items: center;\"><div><h2>History</h2></div><div><a href=\"/history.html\">Download all data</a></div></div>";
 for (let i = 0; i < 7; i++) {
  let j = 0;
  if(wd-i < 0){j = 7;};
@@ -495,7 +497,6 @@ function sendTime(){
 </html>
 )rawliteral";
 
-
 class CaptiveRequestHandler : public AsyncWebHandler {
 public:
   CaptiveRequestHandler() {}
@@ -508,16 +509,8 @@ public:
   }
 
   void handleRequest(AsyncWebServerRequest *request) {
-
-    //float temperature = aht20.getTemperature();
-    //float humidity = aht20.getHumidity();
-
     request->send_P(200, "text/html", index_html, processor);
-
-    events.send("ping",NULL,millis());
-    events.send(String(temperature).c_str(),"temperature",millis());
-    events.send(String(humidity).c_str(),"humidity",millis());
-  }
+  };
 };
 
 void disableWiFi(){
@@ -562,16 +555,16 @@ void mode_normal(){
 }
 
 void setupServer() {
-  server.on("/time", HTTP_GET, [](AsyncWebServerRequest *request) {
+  timeserver.on("/time.html", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send_P(200, "text/html", settime_html, processor);
     if (request->hasParam("set_millis=")) {
       acquiredTime = request->getParam("set_millis=")->value().toInt();
       update_time();
       Serial.printf("Millis received: %lu \n", acquiredTime);
     }
-    request->send_P(200, "text/html", settime_html, processor);
+    request->send_P(200, "text/html", settime_html);
   });
-  server.on("/history", HTTP_GET, [](AsyncWebServerRequest *request) {
+  historyserver.on("/history.html", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send_P(200, "text/html", "<html>History goes here</html>", processor);
   });
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -652,6 +645,8 @@ void setup() {
   setupServer();
 
   server.begin();
+  timeserver.begin();
+  historyserver.begin();
 }
 
 
