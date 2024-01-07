@@ -19,5 +19,7 @@ Features:
 - Power saving operation under low light environment
 - Temperature, relative humidity, atmospheric pressure and TVOC sensors
 - One measurement every 10 minutes
-- Database of up to 52600 entries stored
-- Registry of 6 parameters (max, min temperature; max, min humidity; average pressure; peak TVOC) for the current and the 6 prior days
+- Database of up to 54000 entries stored
+- Registry of 6 parameters (max, min temperature; max, min humidity; minimum pressure; peak TVOC) for the current and the 6 prior days
+
+The module clock can be adjusted by accessing the /settime.html then clicking the "Sync" button, sending the client device milliseconds since epoch by HTTP.
