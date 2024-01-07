@@ -1,5 +1,5 @@
 # Sunny Breeze
-A tiny solar-powered esp32-s2 weather station with wifi capture portal access, capable of logging and displaying instantaneous measurements of temperature, relative humidity, atmospheric pressure and total volatile organic compounds (TVOC) updated once every 10 minutes, plus a daily registry for the current and past 6 days in maximum and minimum temperature and humidity, minimum pressure and maximum TVOC reading. It can also provide the raw data of all measurements since being powered up (maximum of 52600 entries).
+A tiny solar-powered esp32-s2 weather station with wifi capture portal access, capable of logging and displaying instantaneous measurements of temperature, relative humidity, atmospheric pressure and total volatile organic compounds (TVOC) updated once every 10 minutes, plus a daily registry for the current and past 6 days in maximum and minimum temperature and humidity, minimum pressure and maximum TVOC reading. It can also provide the raw data of all measurements since being powered up (maximum of 54000 entries).
 
 
 Current dependencies:
