@@ -14,8 +14,8 @@
 
 DNSServer dnsServer;
 AsyncWebServer server(80);
-AsyncWebServer timeserver(80);
-AsyncWebServer historyserver(80);
+//AsyncWebServer timeserver(80);
+//AsyncWebServer historyserver(80);
 AsyncEventSource events("/events");
 
 unsigned long lastTime = 0;   
@@ -26,7 +26,7 @@ unsigned long timerDelay = 30000;
 float * regtemp;
 float * reghum;
 float * regpres;
-unsigned int * regpol;
+uint32_t * regpol;
 unsigned long * regtime;
 //ps_malloc();
 int step = 0; //iterator for the regtab array. It keeps track of what's the next measurement to be stored.
@@ -67,7 +67,7 @@ float histtemperaturemin[7] = {0.0};
 float histhumiditymax[7] = {404.0, 404.1, 404.2, 404.3, 404.4, 404.5, 404.6};
 float histhumiditymin[7] = {404.0, 404.1, 404.2, 404.3, 404.4, 404.5, 404.6};
 float histpressure[7] = {1404.0, 1404.1, 1404.2, 1404.3, 1404.4, 1404.5, 1404.6};
-unsigned int histpollution[7] = {0};
+uint32_t histpollution[7] = {0};
 
 void save_entry(float val0, float val1, float val2, float val3){
 
@@ -96,6 +96,45 @@ void update_params(){
   Serial.println();
   save_entry(temperature, humidity, pressure, pollution);
 }
+
+struct timeval tv;
+unsigned long acquiredTime = 0;
+unsigned long previousTime = 0;
+void update_time(){
+  for(int i = 0; i < 54000; i++){
+    regtime[i]-= previousTime;
+    regtime[i]+= acquiredTime;
+  };
+  tv.tv_sec = acquiredTime/1000;
+}
+
+void schedule_time(){
+  //Serial.printf("time(null) value: %d \n", time(NULL));//debug stuff
+  //Serial.println(measurement_trigger == true); //debug stuff
+
+  if((time(NULL) % 30) == 0 && measurement_trigger == true) {
+    update_params();
+    measurement_trigger = false;
+    Serial.println("Attempting to send events"); //debug stuff
+    events.send("ping",NULL,millis());
+    events.send(String(temperature).c_str(),"temperature",millis());
+    events.send(String(humidity).c_str(),"humidity",millis());
+  };
+  if ((time(NULL) % 30) > 15 && (time(NULL) % 30) < 20 && measurement_trigger == false)
+  {
+    measurement_trigger = true;
+  };
+}
+
+/*
+String history(){
+  return(
+    for(int i=0; i<54000; i++){
+      regtime[i]+";"+regtemp[i]+";"+reghum[i]+";"+regpres[i]+";"+regpol[i]+"\n";
+    };
+  );
+}
+*/
 
 String processor(const String& var){
   
@@ -126,151 +165,9 @@ String processor(const String& var){
       combined+= String(histpollution[6]);
     return combined;
   }
-    
-  /*
-    else if(var == "D0TEH"){
-    return String(histtemperaturemax[week_f(0)]);
-  }
-    else if(var == "D0TEL"){
-    return String(histtemperaturemin[week_f(0)]);
-  }
-    else if(var == "D0HUH"){
-    return String(histhumiditymax[week_f(0)]);
-  }
-    else if(var == "D0HUL"){
-    return String(histhumiditymin[week_f(0)]);
-  }
-    else if(var == "D0PR"){
-    return String(histpressure[week_f(0)]);
-  } 
-    else if(var == "D0PL"){
-    return String(histpollution[week_f(0)]);
-  }
-    else if(var == "D1TEH"){
-    return String(histtemperaturemax[week_f(1)]);
-  }
-    else if(var == "D1TEL"){
-    return String(histtemperaturemin[week_f(1)]);
-  }
-    else if(var == "D1HUH"){
-    return String(histhumiditymax[week_f(1)]);
-  }
-    else if(var == "D1HUL"){
-    return String(histhumiditymin[week_f(1)]);
-  }
-    else if(var == "D1PR"){
-    return String(histpressure[week_f(1)]);
-  } 
-    else if(var == "D1PL"){
-    return String(histpollution[week_f(1)]);
-  }
-    else if(var == "D2TEH"){
-    return String(histtemperaturemax[week_f(2)]);
-  }
-    else if(var == "D2TEL"){
-    return String(histtemperaturemin[week_f(2)]);
-  }
-    else if(var == "D2HUH"){
-    return String(histhumiditymax[week_f(2)]);
-  }
-    else if(var == "D2HUL"){
-    return String(histhumiditymin[week_f(2)]);
-  }
-    else if(var == "D2PR"){
-    return String(histpressure[week_f(2)]);
-  } 
-    else if(var == "D2PL"){
-    return String(histpollution[week_f(2)]);
-  }
-    else if(var == "D3TEH"){
-    return String(histtemperaturemax[week_f(3)]);
-  }
-    else if(var == "D3TEL"){
-    return String(histtemperaturemin[week_f(3)]);
-  }
-    else if(var == "D3HUH"){
-    return String(histhumiditymax[week_f(3)]);
-  }
-    else if(var == "D3HUL"){
-    return String(histhumiditymin[week_f(3)]);
-  }
-    else if(var == "D3PR"){
-    return String(histpressure[week_f(3)]);
-  } 
-    else if(var == "D3PL"){
-    return String(histpollution[week_f(3)]);
-  }
-    else if(var == "D4TEH"){
-    return String(histtemperaturemax[week_f(4)]);
-  }
-    else if(var == "D4TEL"){
-    return String(histtemperaturemin[week_f(4)]);
-  }
-    else if(var == "D4HUH"){
-    return String(histhumiditymax[week_f(4)]);
-  }
-    else if(var == "D4HUL"){
-    return String(histhumiditymin[week_f(4)]);
-  }
-    else if(var == "D4PR"){
-    return String(histpressure[week_f(4)]);
-  } 
-    else if(var == "D4PL"){
-    return String(histpollution[week_f(4)]);
-  }
-    else if(var == "D5TEH"){
-    return String(histtemperaturemax[week_f(5)]);
-  }
-    else if(var == "D5TEL"){
-    return String(histtemperaturemin[week_f(5)]);
-  }
-    else if(var == "D5HUH"){
-    return String(histhumiditymax[week_f(5)]);
-  }
-    else if(var == "D5HUL"){
-    return String(histhumiditymin[week_f(5)]);
-  }
-    else if(var == "D5PR"){
-    return String(histpressure[week_f(5)]);
-  } 
-    else if(var == "D5PL"){
-    return String(histpollution[week_f(5)]);
-  }
-    else if(var == "D6TEH"){
-    return String(histtemperaturemax[week_f(6)]);
-  }
-    else if(var == "D6TEL"){
-    return String(histtemperaturemin[week_f(6)]);
-  }
-    else if(var == "D6HUH"){
-    return String(histhumiditymax[week_f(6)]);
-  }
-    else if(var == "D6HUL"){
-    return String(histhumiditymin[week_f(6)]);
-  }
-    else if(var == "D6PR"){
-    return String(histpressure[week_f(6)]);
-  } 
-    else if(var == "D6PL"){
-    return String(histpollution[week_f(6)]);
-  }*/
-
+ 
   return String();
 }
-
-/*
-//if there was a generative method in C++ to use these with the else if functions...
-const String histfields[7][6] = {
-  {"D0TEH", "D0TEL", "D0HUH", "D0HUL", "D0PR", "D0PL"},
-  {"D1TEH", "D1TEL", "D1HUH", "D1HUL", "D1PR", "D1PL"},
-  {"D2TEH", "D2TEL", "D2HUH", "D2HUL", "D2PR", "D2PL"},
-  {"D3TEH", "D3TEL", "D3HUH", "D3HUL", "D3PR", "D3PL"},
-  {"D4TEH", "D4TEL", "D4HUH", "D4HUL", "D4PR", "D4PL"},
-  {"D5TEH", "D5TEL", "D5HUH", "D5HUL", "D5PR", "D5PL"},
-  {"D6TEH", "D6TEL", "D6HUH", "D6HUL", "D6PR", "D6PL"},
-};
-*/
-
 
 const char index_html[] PROGMEM = R"rawliteral(
 
@@ -497,18 +394,48 @@ function sendTime(){
 </html>
 )rawliteral";
 
+void sendHistory(){
+  server client = server.available();
+  response->print("<!DOCTYPE html><html>");
+  for(int i=0; i<54000; i++){
+    response->print(String(regtime[i])+";"+String(regtemp[i], 2)+";"+String(reghum[i], 2)+";"+String(regpres[i], 2)+";"+String(regpol[i])+"\n");
+  }
+  response->print("</body></html>");
+  response->print();
+}
+
 class CaptiveRequestHandler : public AsyncWebHandler {
 public:
   CaptiveRequestHandler() {
 
-server.on("/time.html", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send_P(200, "text/html", settime_html);});
+  server.on("/time", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send_P(200, "text/html", settime_html, processor);
+    if (request->hasParam("set_millis=")) {
+      acquiredTime = request->getParam("set_millis=")->value().toInt();
+      update_time();
+      Serial.printf("Millis received: %lu \n", acquiredTime);
+    }
+    request->send_P(200, "text/html", settime_html);
+  });
+  server.on("/time.html", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send_P(200, "text/html", settime_html, processor);
+    if (request->hasParam("set_millis=")) {
+      acquiredTime = request->getParam("set_millis=")->value().toInt();
+      update_time();
+      Serial.printf("Millis received: %lu \n", acquiredTime);
+    }
+    request->send_P(200, "text/html", settime_html);
+  });
 
-server.on("/history.html", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send_P(200, "text/html", "<html>History goes here</html>");});
+  server.on("/history", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send_P(200, "text/html", "<html>History goes here</html>", processor);
+  });
 
+  server.on("/history.html", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send_P(200, "text/html", "<html>History goes here</html>", processor);
+  });
 
-}
+  }
   virtual ~CaptiveRequestHandler() {}
 
 
@@ -519,41 +446,17 @@ server.on("/history.html", HTTP_GET, [](AsyncWebServerRequest *request) {
 
   void handleRequest(AsyncWebServerRequest *request) {
     request->send_P(200, "text/html", index_html, processor);
+    if (request->hasParam("set_millis=")) {
+      acquiredTime = request->getParam("set_millis=")->value().toInt();
+      update_time();
+      Serial.printf("Millis received: %lu \n", acquiredTime);
+    };
   };
 };
 
 void disableWiFi(){
     WiFi.disconnect(true);  // Disconnect from the network
     WiFi.mode(WIFI_OFF);    // Switch WiFi off
-}
-
-struct timeval tv;
-unsigned long acquiredTime = 0;
-unsigned long previousTime = 0;
-void update_time(){
-  for(int i = 0; i < 54000; i++){
-    regtime[i]-= previousTime;
-    regtime[i]+= acquiredTime;
-  };
-  tv.tv_sec = acquiredTime/1000;
-}
-
-void schedule_time(){
-  //Serial.printf("time(null) value: %d \n", time(NULL));//debug stuff
-  //Serial.println(measurement_trigger == true); //debug stuff
-
-  if((time(NULL) % 30) == 0 && measurement_trigger == true) {
-    update_params();
-    measurement_trigger = false;
-    Serial.println("Attempting to send events"); //debug stuff
-    events.send("ping",NULL,millis());
-    events.send(String(temperature).c_str(),"temperature",millis());
-    events.send(String(humidity).c_str(),"humidity",millis());
-  };
-  if ((time(NULL) % 30) > 15 && (time(NULL) % 30) < 20 && measurement_trigger == false)
-  {
-    measurement_trigger = true;
-  };
 }
 
 void mode_normal(){
@@ -564,6 +467,7 @@ void mode_normal(){
 }
 
 void setupServer() {
+  /*
   timeserver.on("/time.html", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send_P(200, "text/html", settime_html, processor);
     if (request->hasParam("set_millis=")) {
@@ -576,8 +480,14 @@ void setupServer() {
   historyserver.on("/history.html", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send_P(200, "text/html", "<html>History goes here</html>", processor);
   });
+  */
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
   request->send_P(200, "text/html", index_html, processor);
+      if (request->hasParam("set_millis=")) {
+      acquiredTime = request->getParam("set_millis=")->value().toInt();
+      update_time();
+      Serial.printf("Millis received: %lu \n", acquiredTime);
+      }
   });
 }
 
@@ -588,7 +498,7 @@ void setup() {
   regtemp = (float *) ps_malloc (54000 * sizeof (float));
   reghum = (float *) ps_malloc (54000 * sizeof (float));
   regpres = (float *) ps_malloc (54000 * sizeof (float));
-  regpol = (unsigned int *) ps_malloc (54000 * sizeof (unsigned int));
+  regpol = (uint32_t *) ps_malloc (54000 * sizeof (unsigned int));
   regtime = (unsigned long *) ps_malloc (54000 * sizeof (unsigned long));
   if(psramInit()){
     Serial.println("\nPSRAM is correctly initialized");
@@ -615,11 +525,11 @@ void setup() {
 
   events.onConnect([](AsyncEventSourceClient *client){
     if(client->lastId()){
-      Serial.printf("Client reconnected! Last message ID that it got is: %u\n", client->lastId());
+      //Serial.printf("Client reconnected! Last message ID that it got is: %u\n", client->lastId());
     }
     // send event with message "hello!", id current millis
     // and set reconnect delay to 1 second
-    client->send("hello!", NULL, millis(), 10000);
+    client->send("hello!", NULL, millis(), 1000);
   });
 
   server.addHandler(new CaptiveRequestHandler()).setFilter(ON_AP_FILTER);  //only when requested from AP
@@ -654,8 +564,8 @@ void setup() {
   setupServer();
 
   server.begin();
-  timeserver.begin();
-  historyserver.begin();
+  //timeserver.begin();
+  //historyserver.begin();
 }
 
 
