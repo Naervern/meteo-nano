@@ -394,6 +394,7 @@ function sendTime(){
 </html>
 )rawliteral";
 
+/*
 void sendHistory(){
   server client = server.available();
   response->print("<!DOCTYPE html><html>");
@@ -403,6 +404,7 @@ void sendHistory(){
   response->print("</body></html>");
   response->print();
 }
+*/
 
 class CaptiveRequestHandler : public AsyncWebHandler {
 public:
