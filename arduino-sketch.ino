@@ -29,7 +29,7 @@ float * regpres;
 uint32_t * regpol;
 unsigned long * regtime;
 //ps_malloc();
-int step = 0; //iterator for the regtab array. It keeps track of what's the next measurement to be stored.
+uint16_t step = 0; //iterator for the regtab array. It keeps track of what's the next measurement to be stored.
 
 bool measurement_trigger = false;
 bool midnight_trigger = false;
@@ -62,12 +62,66 @@ int week_f(int i){
 }
 */
 
+
+// LOW POWER FUNCTIONS HERE
+
+RTC_SLOW_ATTR struct timeval tv;
+RTC_SLOW_ATTR unsigned long acquiredTime = 0;
+RTC_SLOW_ATTR unsigned long previousTime = 0;
+
 float histtemperaturemax[7] = {0.0};
 float histtemperaturemin[7] = {0.0};
 float histhumiditymax[7] = {404.0, 404.1, 404.2, 404.3, 404.4, 404.5, 404.6};
 float histhumiditymin[7] = {404.0, 404.1, 404.2, 404.3, 404.4, 404.5, 404.6};
 float histpressure[7] = {1404.0, 1404.1, 1404.2, 1404.3, 1404.4, 1404.5, 1404.6};
 uint32_t histpollution[7] = {0};
+
+
+RTC_SLOW_ATTR float * d_temp;
+RTC_SLOW_ATTR float * d_hum;
+RTC_SLOW_ATTR float * d_pres;
+RTC_SLOW_ATTR uint32_t * d_pol;
+RTC_SLOW_ATTR unsigned long * d_time;
+RTC_SLOW_ATTR uint8_t d_10m_step = 0;
+RTC_SLOW_ATTR unsigned long ;
+
+int week_it = 0;
+
+void rtc_alloc(){
+  d_temp = (float *) malloc (144 * sizeof (float));
+  d_hum = (float *) malloc (144 * sizeof (float));
+  d_pres = (float *) malloc (144 * sizeof (float));
+  d_pol = (uint32_t *) malloc (144 * sizeof (uint32_t));
+  d_time = (unsigned long *) malloc (144 * sizeof (unsigned long));
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// END OF NEW LOW POWER FUNCTIONS
+
+void update_time(){
+  for(int i = 0; i < 54000; i++){
+    regtime[i]-= previousTime;
+    regtime[i]+= acquiredTime;
+  };
+  tv.tv_sec = acquiredTime/1000;
+}
+
+
 
 void save_entry(float val0, float val1, float val2, float val3){
 
@@ -95,17 +149,6 @@ void update_params(){
   Serial.printf("Humidity = %.2f % \n", humidity);
   Serial.println();
   save_entry(temperature, humidity, pressure, pollution);
-}
-
-struct timeval tv;
-unsigned long acquiredTime = 0;
-unsigned long previousTime = 0;
-void update_time(){
-  for(int i = 0; i < 54000; i++){
-    regtime[i]-= previousTime;
-    regtime[i]+= acquiredTime;
-  };
-  tv.tv_sec = acquiredTime/1000;
 }
 
 void schedule_time(){
