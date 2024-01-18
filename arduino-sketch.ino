@@ -130,7 +130,7 @@ void rtc_alloc(){
 
 void store_measurement(uint16_t step){
   byte byteARR[18] = 0xFF;
-  for (uint8_t i=0; i<143; i++){
+  for (uint8_t i=0; i<144; i++){
     byteARR = {
       d_temp[i] >> 24;
       d_temp[i] >> 16;
@@ -150,8 +150,9 @@ void store_measurement(uint16_t step){
       d_time[i] >> 16;
       d_time[i] >> 8;
       d_time[i] & 0xFF;
-     };
-    for (uint8_t j=0; j<17; j++){
+
+     };
+    for (uint8_t j=0; j<18; j++){
       EEPROM.write(18*step+18*i+j, byteARR[j]);
       };
   };
@@ -162,6 +163,14 @@ void get_measurement (uint16_t step){
 
 }
 
+
+String history(){
+  return(
+    for(int i=0; i<57600; i++){ //57600 = 400 days of 144 measurements
+      regtime[i]+";"+regtemp[i]+";"+reghum[i]+";"+regpres[i]+";"+regpol[i]+"\n";
+    };
+  );
+}
 
 
 void update_time(){
@@ -220,15 +229,6 @@ void schedule_time(){
   };
 }
 
-/*
-String history(){
-  return(
-    for(int i=0; i<54000; i++){
-      regtime[i]+";"+regtemp[i]+";"+reghum[i]+";"+regpres[i]+";"+regpol[i]+"\n";
-    };
-  );
-}
-*/
 
 String processor(const String& var){
   
