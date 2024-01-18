@@ -129,28 +129,31 @@ void rtc_alloc(){
 #define EEPROM_SIZE 3145728; //size of the flash memory to be reserved. 3145728 = 3MB
 
 void store_measurement(uint16_t step){
-  for (uint8_t i; i<144; i++){
-    byte byte00 = d_temp[i] >> 24;
-    byte byte01 = d_temp[i] >> 16;
-    byte byte02 = d_temp[i] >> 8;
-    byte byte03 = d_temp[i] & 0xFF;
-    byte byte04 = d_hum[i] >> 24;
-    byte byte05 = d_hum[i] >> 16;
-    byte byte06 = d_hum[i] >> 8;
-    byte byte07 = d_hum[i] & 0xFF;
-    byte byte08 = d_pres[i] >> 24;
-    byte byte09 = d_pres[i] >> 16;
-    byte byte10 = d_pres[i] >> 8;
-    byte byte11 = d_pres[i] & 0xFF;
-    byte byte12 = d_pol[i] >> 8;
-    byte byte13 = d_pol[i] & 0xFF;
-    byte byte14 = d_time[i] >> 24;
-    byte byte15 = d_time[i] >> 16;
-    byte byte16 = d_time[i] >> 8;
-    byte byte17 = d_time[i] & 0xFF;
-
-
-    EEPROM.write(18*step+i, );
+  byte byteARR[18] = 0xFF;
+  for (uint8_t i=0; i<143; i++){
+    byteARR = {
+      d_temp[i] >> 24;
+      d_temp[i] >> 16;
+      d_temp[i] >> 8;
+      d_temp[i] & 0xFF;
+      d_hum[i] >> 24;
+      d_hum[i] >> 16;
+      d_hum[i] >> 8;
+      d_hum[i] & 0xFF;
+      d_pres[i] >> 24;
+      d_pres[i] >> 16;
+      d_pres[i] >> 8;
+      d_pres[i] & 0xFF;
+      d_pol[i] >> 8;
+      d_pol[i] & 0xFF;
+      d_time[i] >> 24;
+      d_time[i] >> 16;
+      d_time[i] >> 8;
+      d_time[i] & 0xFF;
+     };
+    for (uint8_t j=0; j<17; j++){
+      EEPROM.write(18*step+18*i+j, byteARR[j]);
+      };
   };
 
 }
