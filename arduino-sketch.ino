@@ -53,7 +53,7 @@ Adafruit_BMP280 bmp280; // I2C
 //Adafruit_BMP280 bmp(BMP_CS); // hardware SPI
 //Adafruit_BMP280 bmp(BMP_CS, BMP_MOSI, BMP_MISO,  BMP_SCK);
 
-int week_it = 0;
+uint8_t week_it = 0;
 
 /*
 int week_f(int i){
@@ -69,29 +69,38 @@ RTC_SLOW_ATTR struct timeval tv;
 RTC_SLOW_ATTR unsigned long acquiredTime = 0;
 RTC_SLOW_ATTR unsigned long previousTime = 0;
 
-float histtemperaturemax[7] = {0.0};
-float histtemperaturemin[7] = {0.0};
-float histhumiditymax[7] = {404.0, 404.1, 404.2, 404.3, 404.4, 404.5, 404.6};
-float histhumiditymin[7] = {404.0, 404.1, 404.2, 404.3, 404.4, 404.5, 404.6};
-float histpressure[7] = {1404.0, 1404.1, 1404.2, 1404.3, 1404.4, 1404.5, 1404.6};
-uint32_t histpollution[7] = {0};
+RTC_FAST_ATTR float histtemperaturemax[7] = {0.0};
+RTC_FAST_ATTR float histtemperaturemin[7] = {0.0};
+RTC_FAST_ATTR float histhumiditymax[7] = {404.0, 404.1, 404.2, 404.3, 404.4, 404.5, 404.6};
+RTC_FAST_ATTR float histhumiditymin[7] = {404.0, 404.1, 404.2, 404.3, 404.4, 404.5, 404.6};
+RTC_FAST_ATTR float histpressure[7] = {1404.0, 1404.1, 1404.2, 1404.3, 1404.4, 1404.5, 1404.6};
+RTC_FAST_ATTR uint16_t histpollution[7] = {0};
 
 
 RTC_SLOW_ATTR float * d_temp;
 RTC_SLOW_ATTR float * d_hum;
 RTC_SLOW_ATTR float * d_pres;
-RTC_SLOW_ATTR uint32_t * d_pol;
+RTC_SLOW_ATTR uint16_t * d_pol;
 RTC_SLOW_ATTR unsigned long * d_time;
 RTC_SLOW_ATTR uint8_t d_10m_step = 0;
 RTC_SLOW_ATTR unsigned long ;
 
-int week_it = 0;
+RTC_SLOW_ATTR uint8_t week_it = 0;
+
+/*
+RTC_FAST_ATTR float weektemp;
+RTC_FAST_ATTR float weektemp;
+RTC_FAST_ATTR float weekhum;
+RTC_FAST_ATTR float weekpres;
+RTC_FAST_ATTR uint32_t weekpol;
+RTC_FAST_ATTR unsigned long weektime;
+*/
 
 void rtc_alloc(){
   d_temp = (float *) malloc (144 * sizeof (float));
   d_hum = (float *) malloc (144 * sizeof (float));
   d_pres = (float *) malloc (144 * sizeof (float));
-  d_pol = (uint32_t *) malloc (144 * sizeof (uint32_t));
+  d_pol = (uint16_t *) malloc (144 * sizeof (uint16_t));
   d_time = (unsigned long *) malloc (144 * sizeof (unsigned long));
 }
 
@@ -110,8 +119,46 @@ void rtc_alloc(){
 
 
 
-
 // END OF NEW LOW POWER FUNCTIONS
+
+
+
+//EEPROM FUNCTIONS
+#include <EEPROM.h>
+#define EEPROM_SIZE 3145728; //size of the flash memory to be reserved. 3145728 = 3MB
+
+void store_measurement(uint16_t step){
+  for (uint8_t i; i<144; i++){
+    byte byte00 = d_temp[i] >> 24;
+    byte byte01 = d_temp[i] >> 16;
+    byte byte02 = d_temp[i] >> 8;
+    byte byte03 = d_temp[i] & 0xFF;
+    byte byte04 = d_hum[i] >> 24;
+    byte byte05 = d_hum[i] >> 16;
+    byte byte06 = d_hum[i] >> 8;
+    byte byte07 = d_hum[i] & 0xFF;
+    byte byte08
+    byte byte09
+    byte byte10
+    byte byte11
+    byte byte12
+    byte byte13
+    byte byte14
+    byte byte15
+    byte byte16
+    byte byte17
+
+
+    EEPROM.write(18*step+i, );
+  };
+
+}
+
+void get_measurement (uint16_t step){
+
+}
+
+
 
 void update_time(){
   for(int i = 0; i < 54000; i++){
@@ -538,12 +585,13 @@ void setupServer() {
 
 void setup() {
   setCpuFrequencyMhz(80);
+  EEPROM.begin(EEPROM_SIZE);
   Serial.begin(115200);
   //while (!Serial) {}; // wait for serial port to connect. Needed for native USB port only, easier debugging :P
   regtemp = (float *) ps_malloc (54000 * sizeof (float));
   reghum = (float *) ps_malloc (54000 * sizeof (float));
   regpres = (float *) ps_malloc (54000 * sizeof (float));
-  regpol = (uint32_t *) ps_malloc (54000 * sizeof (unsigned int));
+  regpol = (uint16_t *) ps_malloc (54000 * sizeof (unsigned int));
   regtime = (unsigned long *) ps_malloc (54000 * sizeof (unsigned long));
   if(psramInit()){
     Serial.println("\nPSRAM is correctly initialized");
