@@ -88,9 +88,10 @@ RTC_SLOW_ATTR unsigned long ;
 RTC_SLOW_ATTR uint8_t week_it = 0;
 
 /*
-RTC_FAST_ATTR float weektemp;
-RTC_FAST_ATTR float weektemp;
-RTC_FAST_ATTR float weekhum;
+RTC_FAST_ATTR float weektemp_h;
+RTC_FAST_ATTR float weektemp_l;
+RTC_FAST_ATTR float weekhum_h;
+RTC_FAST_ATTR float weekhum_l;
 RTC_FAST_ATTR float weekpres;
 RTC_FAST_ATTR uint32_t weekpol;
 RTC_FAST_ATTR unsigned long weektime;
@@ -137,16 +138,16 @@ void store_measurement(uint16_t step){
     byte byte05 = d_hum[i] >> 16;
     byte byte06 = d_hum[i] >> 8;
     byte byte07 = d_hum[i] & 0xFF;
-    byte byte08
-    byte byte09
-    byte byte10
-    byte byte11
-    byte byte12
-    byte byte13
-    byte byte14
-    byte byte15
-    byte byte16
-    byte byte17
+    byte byte08 = d_pres[i] >> 24;
+    byte byte09 = d_pres[i] >> 16;
+    byte byte10 = d_pres[i] >> 8;
+    byte byte11 = d_pres[i] & 0xFF;
+    byte byte12 = d_pol[i] >> 8;
+    byte byte13 = d_pol[i] & 0xFF;
+    byte byte14 = d_time[i] >> 24;
+    byte byte15 = d_time[i] >> 16;
+    byte byte16 = d_time[i] >> 8;
+    byte byte17 = d_time[i] & 0xFF;
 
 
     EEPROM.write(18*step+i, );
