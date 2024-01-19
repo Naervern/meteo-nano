@@ -97,7 +97,7 @@ RTC_FAST_ATTR uint32_t weekpol;
 RTC_FAST_ATTR unsigned long weektime;
 */
 
-void rtc_alloc(){
+inline void rtc_alloc(){
   d_temp = (float *) malloc (144 * sizeof (float));
   d_hum = (float *) malloc (144 * sizeof (float));
   d_pres = (float *) malloc (144 * sizeof (float));
@@ -550,11 +550,11 @@ public:
   };
 };
 
-void disableWiFi(){
+inline void disableWiFi(){
     WiFi.disconnect(true);  // Disconnect from the network
     WiFi.mode(WIFI_OFF);    // Switch WiFi off
 }
-
+inline void mode_normal() __attribute__((always_inline));
 void mode_normal(){
   schedule_time();
 
