@@ -11,6 +11,7 @@
 
 #include <Wire.h>
 
+#define TOTALENTRIES 57600
 
 DNSServer dnsServer;
 AsyncWebServer server(80);
@@ -26,7 +27,7 @@ unsigned long timerDelay = 30000;
 float * regtemp;
 float * reghum;
 float * regpres;
-uint32_t * regpol;
+uint16_t * regpol;
 unsigned long * regtime;
 //ps_malloc();
 uint16_t step = 0; //iterator for the regtab array. It keeps track of what's the next measurement to be stored.
@@ -52,8 +53,6 @@ SparkFun_ENS160_SPI ens160;
 Adafruit_BMP280 bmp280; // I2C
 //Adafruit_BMP280 bmp(BMP_CS); // hardware SPI
 //Adafruit_BMP280 bmp(BMP_CS, BMP_MOSI, BMP_MISO,  BMP_SCK);
-
-uint8_t week_it = 0;
 
 /*
 int week_f(int i){
@@ -83,7 +82,6 @@ RTC_SLOW_ATTR float * d_pres;
 RTC_SLOW_ATTR uint16_t * d_pol;
 RTC_SLOW_ATTR unsigned long * d_time;
 RTC_SLOW_ATTR uint8_t d_10m_step = 0;
-RTC_SLOW_ATTR unsigned long ;
 
 RTC_SLOW_ATTR uint8_t week_it = 0;
 
@@ -126,12 +124,18 @@ inline void rtc_alloc(){
 
 //EEPROM FUNCTIONS
 #include <EEPROM.h>
-#define EEPROM_SIZE 3145728; //size of the flash memory to be reserved. 3145728 = 3MB
+#define EEPROM_SIZE 3145728 //size of the flash memory to be reserved. 3145728 = 3MB
 
 void store_measurement(uint16_t step){
-  byte byteARR[18] = 0xFF;
+  byte byteARR[18] = {0xFF};
   for (uint8_t i=0; i<144; i++){
-    byteARR = {
+    EEPROM.put(step+i-16, d_time[i]); //reserving the first 128 bytes of EEPROM for reasons
+    EEPROM.put(step+i-12, d_temp[i]);
+    EEPROM.put(step+i-8, d_hum[i]);
+    EEPROM.put(step+i-4, d_pres[i]);
+    EEPROM.put(step+i, d_pol[i]);
+    /*
+    byteARR[18] = {
       d_temp[i] >> 24;
       d_temp[i] >> 16;
       d_temp[i] >> 8;
@@ -150,35 +154,51 @@ void store_measurement(uint16_t step){
       d_time[i] >> 16;
       d_time[i] >> 8;
       d_time[i] & 0xFF;
-
      };
     for (uint8_t j=0; j<18; j++){
       EEPROM.write(18*step+18*i+j, byteARR[j]);
       };
+    */
   };
 
 }
 
-void get_measurement (uint16_t step){
+class readEntry {
+  public:
+    unsigned long tim;
+    float temp;
+    float hum;
+    float pres;
+    uint16_t pol;
+  
+  void get_measurement (uint16_t pas){
+    EEPROM.get(pas+128, tim); //reserving the first 128 bytes of EEPROM for reasons
+    EEPROM.get(pas+132, temp);
+    EEPROM.get(pas+136, hum);
+    EEPROM.get(pas+140, pres);
+    EEPROM.get(pas+142, pol);
+  }
+};
 
+/*
+void get_measurement (uint16_t pas){
+    EEPROM.get(pas+128, unsigned long d_time[i]); //reserving the first 128 bytes of EEPROM for reasons
+    EEPROM.get(pas+132, float d_temp[i]);
+    EEPROM.get(pas+136, float d_hum[i]);
+    EEPROM.get(pas+140, float d_pres[i]);
+    EEPROM.get(pas+142, uint16_t d_pol[i]);
 }
-
-
-String history(){
-  return(
-    for(int i=0; i<57600; i++){ //57600 = 400 days of 144 measurements
-      regtime[i]+";"+regtemp[i]+";"+reghum[i]+";"+regpres[i]+";"+regpol[i]+"\n";
-    };
-  );
-}
+*/
 
 
 void update_time(){
-  for(int i = 0; i < 54000; i++){
-    regtime[i]-= previousTime;
-    regtime[i]+= acquiredTime;
+  if(previousTime = 0){
+    previousTime = millis();
   };
-  tv.tv_sec = acquiredTime/1000;
+  for(int i = 0; i < 54000; i++){
+    regtime[i]+= (acquiredTime - previousTime);
+  };
+  tv.tv_sec = acquiredTime;
 }
 
 
@@ -513,21 +533,8 @@ public:
     }
     request->send_P(200, "text/html", settime_html);
   });
-  server.on("/time.html", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send_P(200, "text/html", settime_html, processor);
-    if (request->hasParam("set_millis=")) {
-      acquiredTime = request->getParam("set_millis=")->value().toInt();
-      update_time();
-      Serial.printf("Millis received: %lu \n", acquiredTime);
-    }
-    request->send_P(200, "text/html", settime_html);
-  });
 
   server.on("/history", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send_P(200, "text/html", "<html>History goes here</html>", processor);
-  });
-
-  server.on("/history.html", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send_P(200, "text/html", "<html>History goes here</html>", processor);
   });
 
@@ -550,6 +557,7 @@ public:
   };
 };
 
+inline void disableWiFi() __attribute__((always_inline));
 inline void disableWiFi(){
     WiFi.disconnect(true);  // Disconnect from the network
     WiFi.mode(WIFI_OFF);    // Switch WiFi off
