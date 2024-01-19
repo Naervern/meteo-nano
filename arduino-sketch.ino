@@ -172,6 +172,23 @@ String history(){
   );
 }
 
+void send_db(){
+WiFiClient client = WebServer.client();
+client.print("HTTP/1.1 200 OK\r\n");
+client.print("Content-Disposition: attachment; filename=config.txt\r\n");
+client.print("Content-Type: application/octet-stream\r\n");
+client.print("Content-Length: 2048\r\n");
+client.print("Connection: close\r\n");
+client.print("Access-Control-Allow-Origin: *\r\n");
+client.print("\r\n");
+client.write((const char*)data, 2048);
+}
+
+
+
+
+
+
 
 void update_time(){
   for(int i = 0; i < 54000; i++){
