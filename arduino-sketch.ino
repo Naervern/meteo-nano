@@ -190,6 +190,7 @@ void get_measurement (uint16_t pas){
 }
 */
 
+/*
 void send_db(){
 WiFiClient client = WebServer.client();
 client.print("HTTP/1.1 200 OK\r\n");
@@ -201,12 +202,7 @@ client.print("Access-Control-Allow-Origin: *\r\n");
 client.print("\r\n");
 client.write((const char*)data, 2048);
 }
-
-
-
-
-
-
+*/
 
 void update_time(){
   if(previousTime = 0){
