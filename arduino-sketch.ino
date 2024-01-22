@@ -6,7 +6,7 @@
 #include "AsyncUDP.h"
 #include <SPI.h>
 #include <AHT20.h>
-#include "SparkFun_ENS160.h"
+#include <DFRobot_ENS160.h>
 #include <Adafruit_BMP280.h>
 
 #include <Wire.h>
@@ -42,17 +42,24 @@ float humidity;
 float pressure;
 float pollution;
 
-//ENS160 TVOC sensor stuff
-SparkFun_ENS160_SPI ens160;
 
-#define BMP_SCK  (13)
-#define BMP_MISO (12)
-#define BMP_MOSI (11)
-#define BMP_CS   (10)
 
-Adafruit_BMP280 bmp280; // I2C
+#define BMP_SCK  (35) //SCL
+#define BMP_MISO (18) //SDO
+#define BMP_MOSI (33) //SDA
+#define BMP_CS   (37) //CSB
+
+//Adafruit_BMP280 bmp280; // I2C
 //Adafruit_BMP280 bmp(BMP_CS); // hardware SPI
-//Adafruit_BMP280 bmp(BMP_CS, BMP_MOSI, BMP_MISO,  BMP_SCK);
+Adafruit_BMP280 bmp280(BMP_CS, BMP_MOSI, BMP_MISO, BMP_SCK);
+
+//ENS160 TVOC sensor stuff
+#define ENS_SCK  (35) //SCL
+#define ENS_MISO (39) //SDO
+#define ENS_MOSI (33) //SDA
+#define ENS_CS   (16) //CSB
+//SparkFun_ENS160_SPI ens160(ENS_CS, ENS_MOSI, ENS_MISO, ENS_SCK);
+DFRobot_ENS160_SPI ENS160(&SPI, ENS_CS);
 
 /*
 int week_f(int i){
@@ -230,18 +237,33 @@ void save_entry(float val0, float val1, float val2, float val3){
 }
 
 void update_params(){
+  /**
+   * Set power mode
+   * mode Configurable power mode:
+   *   ENS160_SLEEP_MODE: DEEP SLEEP mode (low power standby)
+   *   ENS160_IDLE_MODE: IDLE mode (low-power)
+   *   ENS160_STANDARD_MODE: STANDARD Gas Sensing Modes
+   */
+  ENS160.setPWRMode(ENS160_STANDARD_MODE);
   //add any sensor measurement here
+  digitalWrite(ENS_CS, LOW);
   temperature = aht20.getTemperature();
   humidity = aht20.getHumidity();
-  pressure = 505.1; //placeholder
-  //pressure = bmp280.readPressure();
-  pollution = 505.2; //placehholder
-  //pollution = ens160.getTVOC();
+  ENS160.setTempAndHum(temperature, humidity);
+  pollution = ENS160.getTVOC();
+  ENS160.setPWRMode(ENS160_SLEEP_MODE);
+  digitalWrite(ENS_CS, HIGH);
+  digitalWrite(BMP_CS, LOW);
+  pressure = bmp280.readPressure();
+  digitalWrite(BMP_CS, HIGH);
   Serial.println("New measurement");
   Serial.printf("Temperature = %.2f ℃ \n", temperature);
   Serial.printf("Humidity = %.2f % \n", humidity);
   Serial.println();
   save_entry(temperature, humidity, pressure, pollution);
+
+
+
 }
 
 void schedule_time(){
@@ -612,7 +634,9 @@ void setup() {
   setCpuFrequencyMhz(80);
   EEPROM.begin(EEPROM_SIZE);
   Serial.begin(115200);
-  //while (!Serial) {}; // wait for serial port to connect. Needed for native USB port only, easier debugging :P
+  pinMode(BMP_CS, OUTPUT);
+  pinMode(ENS_CS, OUTPUT);
+  while (!Serial) {}; // wait for serial port to connect. Needed for native USB port only, easier debugging :P
   regtemp = (float *) ps_malloc (54000 * sizeof (float));
   reghum = (float *) ps_malloc (54000 * sizeof (float));
   regpres = (float *) ps_malloc (54000 * sizeof (float));
@@ -631,8 +655,8 @@ void setup() {
   
   Wire.begin(); //Join I2C bus
   //Check if the AHT20 will acknowledge
-  if (aht20.begin() == false){Serial.println("AHT20 not detected. Please check wiring. Freezing.");while (1);}
-  Serial.println("AHT20 acknowledged.");
+  if (aht20.begin() == false){Serial.println("AHT20 not detected. Please check wiring.");} else {Serial.println("AHT20 acknowledged.");}
+  
   update_params();
 
   WiFi.mode(WIFI_AP);
@@ -656,8 +680,8 @@ void setup() {
 
   //Setup for the BMP280 sensor
     unsigned status;
-  //status = bmp280.begin(BMP280_ADDRESS_ALT, BMP280_CHIPID);
-  /* When the BMP280 is around...
+  status = bmp280.begin(BMP280_ADDRESS_ALT, BMP280_CHIPID);
+  /* When the BMP280 is around... */
   status = bmp280.begin();
   if (!status) {
     Serial.println(F("Could not find a valid BMP280 sensor, check wiring or "
@@ -669,7 +693,6 @@ void setup() {
     Serial.print("        ID of 0x61 represents a BME 680.\n");
     while (1) delay(10);
   }
-    */
   
   /* Default settings from datasheet. */
   //bmp280.setSampling(Adafruit_BMP280::MODE_NORMAL,     /* Operating Mode. */
