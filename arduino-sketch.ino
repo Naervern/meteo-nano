@@ -4,13 +4,17 @@
 #include <ESPAsyncWebServer.h>
 #include <time.h>
 #include "AsyncUDP.h"
-#include <SPI.h>
+//#include <SPI.h>
 #include <AHT20.h>
 #include "SparkFun_ENS160.h"
-#include <Adafruit_BMP280.h>
-
 #include <Wire.h>
+#include <EEPROM.h>
 
+#define TOTALENTRIES 57600
+
+//#define AHT21_ADDRESS 0x38
+//#define ENS160_ADDRESS 0x53
+//#define BMP280_ADDRESS 0x76
 
 DNSServer dnsServer;
 AsyncWebServer server(80);
@@ -21,39 +25,248 @@ AsyncEventSource events("/events");
 unsigned long lastTime = 0;   
 unsigned long timerDelay = 30000;
 
-//unsigned long regtime[52600] = {0};
-//float regtab[52600][4] = {0.0};
 float * regtemp;
 float * reghum;
 float * regpres;
-uint32_t * regpol;
+uint16_t * regpol;
 unsigned long * regtime;
 //ps_malloc();
-int step = 0; //iterator for the regtab array. It keeps track of what's the next measurement to be stored.
+uint16_t step = 0; //iterator for the regtab array. It keeps track of what's the next measurement to be stored.
 
 bool measurement_trigger = false;
 bool midnight_trigger = false;
 bool wifi_on = false;
 
 AHT20 aht20;
+
+SparkFun_ENS160 ens160;
+
 float temperature;
 float humidity;
 float pressure;
-float pollution;
+uint16_t pollution;
 
-//ENS160 TVOC sensor stuff
-SparkFun_ENS160_SPI ens160;
 
-#define BMP_SCK  (13)
-#define BMP_MISO (12)
-#define BMP_MOSI (11)
-#define BMP_CS   (10)
 
-Adafruit_BMP280 bmp280; // I2C
-//Adafruit_BMP280 bmp(BMP_CS); // hardware SPI
-//Adafruit_BMP280 bmp(BMP_CS, BMP_MOSI, BMP_MISO,  BMP_SCK);
+class BME280_I2C{
+    
+    public:
 
-int week_it = 0;
+    const uint8_t ADDRESS = 0x76; //default address is 0x76
+
+    BME280_I2C(){}
+
+    BME280_I2C(const uint8_t& x) : ADDRESS(x) {}
+
+    uint8_t osrs_t = 1;             //Temperature oversampling x 1
+    uint8_t osrs_p = 1;             //Pressure oversampling x 1
+    uint8_t osrs_h = 1;             //Humidity oversampling x 1
+    uint8_t mode = 3;               //Normal mode
+    uint8_t t_sb = 5;               //Tstandby 1000ms
+    uint8_t filter = 0;             //Filter off 
+    uint8_t spi3w_en = 0;           //3-wire SPI Disable
+    
+    unsigned long int hum_raw,temp_raw,pres_raw;
+    signed long int t_fine;
+    double temp_act = 0.0, press_act = 0.0,hum_act=0.0;
+    signed long int temp_cal;
+    unsigned long int press_cal,hum_cal;
+
+    float temperature {0};
+    float pressure {0};
+    float humidity {0};
+
+    void read(){
+        readData();
+          temp_cal = calibration_T(temp_raw);
+          temp_act = (double)temp_cal / 100.0;
+          press_cal = calibration_P(pres_raw);
+          press_act = (double)press_cal / 100.0;
+          hum_cal = calibration_H(hum_raw);
+          hum_act = (double)hum_cal / 1024.0;
+          temperature = (float)temp_act;
+          pressure = (float)press_act;
+          humidity = (float)hum_act;
+    }
+
+    void begin(){
+        //Wire.begin();
+        writeReg(0xF2,ctrl_hum_reg);
+        writeReg(0xF4,ctrl_meas_reg);
+        writeReg(0xF5,config_reg);
+        
+        //begin Trim
+        uint8_t i=0;
+        Wire.beginTransmission(ADDRESS);
+        Wire.write(0x88);
+        Wire.endTransmission();
+        Wire.requestFrom(ADDRESS,24);
+        while(Wire.available()){
+            data[i] = Wire.read();
+            i++;
+        }
+            
+        Wire.beginTransmission(ADDRESS);
+        Wire.write(0xA1);
+        Wire.endTransmission();
+        Wire.requestFrom(ADDRESS,1);
+        data[i] = Wire.read();
+        i++;
+        
+        Wire.beginTransmission(ADDRESS);
+        Wire.write(0xE1);
+        Wire.endTransmission();
+        Wire.requestFrom(ADDRESS,7);
+        while(Wire.available()){
+            data[i] = Wire.read();
+            i++;    
+        }
+        dig_T1 = (data[1] << 8) | data[0];
+        dig_T2 = (data[3] << 8) | data[2];
+        dig_T3 = (data[5] << 8) | data[4];
+        dig_P1 = (data[7] << 8) | data[6];
+        dig_P2 = (data[9] << 8) | data[8];
+        dig_P3 = (data[11]<< 8) | data[10];
+        dig_P4 = (data[13]<< 8) | data[12];
+        dig_P5 = (data[15]<< 8) | data[14];
+        dig_P6 = (data[17]<< 8) | data[16];
+        dig_P7 = (data[19]<< 8) | data[18];
+        dig_P8 = (data[21]<< 8) | data[20];
+        dig_P9 = (data[23]<< 8) | data[22];
+        dig_H1 = data[24];
+        dig_H2 = (data[26]<< 8) | data[25];
+        dig_H3 = data[27];
+        dig_H4 = (data[28]<< 4) | (0x0F & data[29]);
+        dig_H5 = (data[30]<< 4) | ((data[29] >> 4) & 0x0F);
+        dig_H6 = data[31];
+        
+    }
+
+    float getTemperature(){ //returns temperature in ºC
+        readData();
+        temp_cal = calibration_T(temp_raw);
+        temp_act = (double)temp_cal / 100.0;
+        return((float)temp_act);
+    }
+
+    float getPressure(){ //returns pressure in hPa
+        readData();
+        press_cal = calibration_P(pres_raw);
+        press_act = (double)press_cal / 100.0;
+        return((float)press_act);
+    }
+
+    float getHumidity(){ //returns relative atmospheric humidity in %
+        readData();
+        hum_cal = calibration_H(hum_raw);
+        hum_act = (double)hum_cal / 1024.0;
+        return((float)hum_act);
+    }
+    
+    void readData(){
+        //Serial.println("readData() function called");
+        int i = 0;
+        uint32_t data[8];
+        Wire.beginTransmission(ADDRESS);
+        Wire.write(0xF7);
+        Wire.endTransmission();
+        Wire.requestFrom(ADDRESS,8);
+        while(Wire.available()){
+            data[i] = Wire.read();
+            i++;
+        }
+        pres_raw = (data[0] << 12) | (data[1] << 4) | (data[2] >> 4);
+        temp_raw = (data[3] << 12) | (data[4] << 4) | (data[5] >> 4);
+        hum_raw  = (data[6] << 8) | data[7];
+    }
+
+    private:
+        uint8_t data[32];
+
+        uint8_t ctrl_meas_reg = (osrs_t << 5) | (osrs_p << 2) | mode;
+        uint8_t config_reg    = (t_sb << 5) | (filter << 2) | spi3w_en;
+        uint8_t ctrl_hum_reg  = osrs_h;
+
+        uint16_t dig_T1;
+        int16_t dig_T2;
+        int16_t dig_T3;
+        uint16_t dig_P1;
+        int16_t dig_P2;
+        int16_t dig_P3;
+        int16_t dig_P4;
+        int16_t dig_P5;
+        int16_t dig_P6;
+        int16_t dig_P7;
+        int16_t dig_P8;
+        int16_t dig_P9;
+        int8_t  dig_H1;
+        int16_t dig_H2;
+        int8_t  dig_H3;
+        int16_t dig_H4;
+        int16_t dig_H5;
+        int8_t  dig_H6;
+
+        void writeReg(uint8_t reg_address, uint8_t data){
+            Wire.beginTransmission(ADDRESS);
+            Wire.write(reg_address);
+            Wire.write(data);
+            Wire.endTransmission();    
+        }
+
+    signed long int calibration_T(signed long int adc_T)    {        
+        signed long int var1, var2, T;
+        var1 = ((((adc_T >> 3) - ((signed long int)dig_T1<<1))) * ((signed long int)dig_T2)) >> 11;
+        var2 = (((((adc_T >> 4) - ((signed long int)dig_T1)) * ((adc_T>>4) - ((signed long int)dig_T1))) >> 12) * ((signed long int)dig_T3)) >> 14;
+        
+        t_fine = var1 + var2;
+        T = (t_fine * 5 + 128) >> 8;
+        return T; 
+    }
+
+    unsigned long int calibration_P(signed long int adc_P)    {
+        signed long int var1, var2;
+        unsigned long int P;
+        var1 = (((signed long int)t_fine)>>1) - (signed long int)64000;
+        var2 = (((var1>>2) * (var1>>2)) >> 11) * ((signed long int)dig_P6);
+        var2 = var2 + ((var1*((signed long int)dig_P5))<<1);
+        var2 = (var2>>2)+(((signed long int)dig_P4)<<16);
+        var1 = (((dig_P3 * (((var1>>2)*(var1>>2)) >> 13)) >>3) + ((((signed long int)dig_P2) * var1)>>1))>>18;
+        var1 = ((((32768+var1))*((signed long int)dig_P1))>>15);
+        if (var1 == 0)
+        {
+            return 0;
+        }    
+        P = (((unsigned long int)(((signed long int)1048576)-adc_P)-(var2>>12)))*3125;
+        if(P<0x80000000)
+        {
+        P = (P << 1) / ((unsigned long int) var1);   
+        }
+        else
+        {
+            P = (P / (unsigned long int)var1) * 2;    
+        }
+        var1 = (((signed long int)dig_P9) * ((signed long int)(((P>>3) * (P>>3))>>13)))>>12;
+        var2 = (((signed long int)(P>>2)) * ((signed long int)dig_P8))>>13;
+        P = (unsigned long int)((signed long int)P + ((var1 + var2 + dig_P7) >> 4));
+        return P;
+    }
+
+    unsigned long int calibration_H(signed long int adc_H)    {
+        signed long int v_x1;        
+        v_x1 = (t_fine - ((signed long int)76800));
+        v_x1 = (((((adc_H << 14) -(((signed long int)dig_H4) << 20) - (((signed long int)dig_H5) * v_x1)) + 
+        ((signed long int)16384)) >> 15) * (((((((v_x1 * ((signed long int)dig_H6)) >> 10) * 
+        (((v_x1 * ((signed long int)dig_H3)) >> 11) + ((signed long int) 32768))) >> 10) + (( signed long int)2097152)) * 
+        ((signed long int) dig_H2) + 8192) >> 14));
+        v_x1 = (v_x1 - (((((v_x1 >> 15) * (v_x1 >> 15)) >> 7) * ((signed long int)dig_H1)) >> 4));
+        v_x1 = (v_x1 < 0 ? 0 : v_x1);
+        v_x1 = (v_x1 > 419430400 ? 419430400 : v_x1);
+        return (unsigned long int)(v_x1 >> 12);   
+    }
+};
+
+
+BME280_I2C bmp280;
 
 /*
 int week_f(int i){
@@ -62,14 +275,150 @@ int week_f(int i){
 }
 */
 
-float histtemperaturemax[7] = {0.0};
-float histtemperaturemin[7] = {0.0};
-float histhumiditymax[7] = {404.0, 404.1, 404.2, 404.3, 404.4, 404.5, 404.6};
-float histhumiditymin[7] = {404.0, 404.1, 404.2, 404.3, 404.4, 404.5, 404.6};
-float histpressure[7] = {1404.0, 1404.1, 1404.2, 1404.3, 1404.4, 1404.5, 1404.6};
-uint32_t histpollution[7] = {0};
 
-void save_entry(float val0, float val1, float val2, float val3){
+// LOW POWER FUNCTIONS HERE
+
+RTC_SLOW_ATTR struct timeval tv;
+RTC_SLOW_ATTR unsigned long acquiredTime = 0;
+RTC_SLOW_ATTR unsigned long previousTime = 0;
+
+RTC_FAST_ATTR float histtemperaturemax[7] = {0.0};
+RTC_FAST_ATTR float histtemperaturemin[7] = {0.0};
+RTC_FAST_ATTR float histhumiditymax[7] = {404.0, 404.1, 404.2, 404.3, 404.4, 404.5, 404.6};
+RTC_FAST_ATTR float histhumiditymin[7] = {404.0, 404.1, 404.2, 404.3, 404.4, 404.5, 404.6};
+RTC_FAST_ATTR float histpressure[7] = {1404.0, 1404.1, 1404.2, 1404.3, 1404.4, 1404.5, 1404.6};
+RTC_FAST_ATTR uint16_t histpollution[7] = {0};
+
+
+RTC_SLOW_ATTR float * d_temp;
+RTC_SLOW_ATTR float * d_hum;
+RTC_SLOW_ATTR float * d_pres;
+RTC_SLOW_ATTR uint16_t * d_pol;
+RTC_SLOW_ATTR unsigned long * d_time;
+RTC_SLOW_ATTR uint8_t d_10m_step = 0;
+
+RTC_SLOW_ATTR uint8_t week_it = 0;
+
+/*
+RTC_FAST_ATTR float weektemp_h;
+RTC_FAST_ATTR float weektemp_l;
+RTC_FAST_ATTR float weekhum_h;
+RTC_FAST_ATTR float weekhum_l;
+RTC_FAST_ATTR float weekpres;
+RTC_FAST_ATTR uint32_t weekpol;
+RTC_FAST_ATTR unsigned long weektime;
+*/
+
+inline void rtc_alloc(){
+  d_temp = (float *) malloc (144 * sizeof (float));
+  d_hum = (float *) malloc (144 * sizeof (float));
+  d_pres = (float *) malloc (144 * sizeof (float));
+  d_pol = (uint16_t *) malloc (144 * sizeof (uint16_t));
+  d_time = (unsigned long *) malloc (144 * sizeof (unsigned long));
+}
+
+
+
+
+// END OF NEW LOW POWER FUNCTIONS
+
+
+
+//EEPROM FUNCTIONS
+
+#define EEPROM_SIZE 3145728 //size of the flash memory to be reserved. 3145728 = 3MB
+
+void store_measurement(uint16_t step){
+  byte byteARR[18] = {0xFF};
+  for (uint8_t i=0; i<144; i++){
+    EEPROM.put(step+i-16, d_time[i]); //reserving the first 128 bytes of EEPROM for reasons
+    EEPROM.put(step+i-12, d_temp[i]);
+    EEPROM.put(step+i-8, d_hum[i]);
+    EEPROM.put(step+i-4, d_pres[i]);
+    EEPROM.put(step+i, d_pol[i]);
+    /*
+    byteARR[18] = {
+      d_temp[i] >> 24;
+      d_temp[i] >> 16;
+      d_temp[i] >> 8;
+      d_temp[i] & 0xFF;
+      d_hum[i] >> 24;
+      d_hum[i] >> 16;
+      d_hum[i] >> 8;
+      d_hum[i] & 0xFF;
+      d_pres[i] >> 24;
+      d_pres[i] >> 16;
+      d_pres[i] >> 8;
+      d_pres[i] & 0xFF;
+      d_pol[i] >> 8;
+      d_pol[i] & 0xFF;
+      d_time[i] >> 24;
+      d_time[i] >> 16;
+      d_time[i] >> 8;
+      d_time[i] & 0xFF;
+     };
+    for (uint8_t j=0; j<18; j++){
+      EEPROM.write(18*step+18*i+j, byteARR[j]);
+      };
+    */
+  };
+
+}
+
+class readEntry {
+  public:
+    unsigned long tim;
+    float temp;
+    float hum;
+    float pres;
+    uint16_t pol;
+  
+  void get_measurement (uint16_t pas){
+    EEPROM.get(pas+128, tim); //reserving the first 128 bytes of EEPROM for reasons
+    EEPROM.get(pas+132, temp);
+    EEPROM.get(pas+136, hum);
+    EEPROM.get(pas+140, pres);
+    EEPROM.get(pas+142, pol);
+  }
+};
+
+/*
+void get_measurement (uint16_t pas){
+    EEPROM.get(pas+128, unsigned long d_time[i]); //reserving the first 128 bytes of EEPROM for reasons
+    EEPROM.get(pas+132, float d_temp[i]);
+    EEPROM.get(pas+136, float d_hum[i]);
+    EEPROM.get(pas+140, float d_pres[i]);
+    EEPROM.get(pas+142, uint16_t d_pol[i]);
+}
+*/
+
+/*
+void send_db(){
+WiFiClient client = WebServer.client();
+client.print("HTTP/1.1 200 OK\r\n");
+client.print("Content-Disposition: attachment; filename=config.txt\r\n");
+client.print("Content-Type: application/octet-stream\r\n");
+client.print("Content-Length: 2048\r\n");
+client.print("Connection: close\r\n");
+client.print("Access-Control-Allow-Origin: *\r\n");
+client.print("\r\n");
+client.write((const char*)data, 2048);
+}
+*/
+
+void update_time(){
+  if(previousTime = 0){
+    previousTime = millis();
+  };
+  for(int i = 0; i < TOTALENTRIES; i++){
+    regtime[i]+= (acquiredTime - previousTime);
+  };
+  tv.tv_sec = acquiredTime;
+}
+
+
+
+void save_entry(float val0, float val1, float val2, uint16_t val3){
 
   // This function saves entries to the next 
 
@@ -79,33 +428,60 @@ void save_entry(float val0, float val1, float val2, float val3){
   regpol[step] = val3;
   regtime[step] = millis();
   step++;
-  if(step > 53999){step = 0;};
+  if(step > TOTALENTRIES){step = 0;};
 }
 
 void update_params(){
+  /**
+   * Set power mode
+   * mode Configurable power mode:
+   *   ENS160_SLEEP_MODE: DEEP SLEEP mode (low power standby)
+   *   ENS160_IDLE_MODE: IDLE mode (low-power)
+   *   ENS160_STANDARD_MODE: STANDARD Gas Sensing Modes
+   */
+  //ENS160.setPWRMode(ENS160_STANDARD_MODE);
   //add any sensor measurement here
-  temperature = aht20.getTemperature();
+  //digitalWrite(ENS_CS, LOW);
+  //temperature = aht20.getTemperature();
   humidity = aht20.getHumidity();
-  pressure = 505.1; //placeholder
-  //pressure = bmp280.readPressure();
-  pollution = 505.2; //placehholder
-  //pollution = ens160.getTVOC();
-  Serial.println("New measurement");
-  Serial.printf("Temperature = %.2f ℃ \n", temperature);
-  Serial.printf("Humidity = %.2f % \n", humidity);
-  Serial.println();
-  save_entry(temperature, humidity, pressure, pollution);
-}
+  //ENS160.setTempAndHum(temperature, humidity);
+  
+  
+    ens160.checkDataStatus();
+	
+		Serial.print("Air Quality Index (1-5) : ");
+		Serial.println(ens160.getAQI());
 
-struct timeval tv;
-unsigned long acquiredTime = 0;
-unsigned long previousTime = 0;
-void update_time(){
-  for(int i = 0; i < 54000; i++){
-    regtime[i]-= previousTime;
-    regtime[i]+= acquiredTime;
-  };
-  tv.tv_sec = acquiredTime/1000;
+		Serial.print("Total Volatile Organic Compounds: ");
+		Serial.print(ens160.getTVOC());
+		Serial.println("ppb");
+
+		Serial.print("CO2 concentration: ");
+		Serial.print(ens160.getECO2());
+		Serial.println("ppm");
+    pollution = ens160.getTVOC();
+  
+  
+  
+  
+  //ENS160.setPWRMode(ENS160_SLEEP_MODE);
+  //pressure = bmp280.readPressure();
+  bmp280.read();
+  temperature = bmp280.temperature;
+  pressure = bmp280.pressure;
+  Serial.println("New measurement");
+  Serial.printf("Temperature = %.2f °C", temperature);
+    Serial.println();
+  Serial.printf("Humidity = %.2f %", humidity);
+    Serial.println();
+  Serial.printf("Pressure = %.2f %", pressure);
+    Serial.println();
+  Serial.printf("TVOC = %u %", pollution);
+  Serial.println();
+  //save_entry(temperature, humidity, pressure, pollution);
+
+
+
 }
 
 void schedule_time(){
@@ -126,15 +502,6 @@ void schedule_time(){
   };
 }
 
-/*
-String history(){
-  return(
-    for(int i=0; i<54000; i++){
-      regtime[i]+";"+regtemp[i]+";"+reghum[i]+";"+regpres[i]+";"+regpol[i]+"\n";
-    };
-  );
-}
-*/
 
 String processor(const String& var){
   
@@ -398,7 +765,7 @@ function sendTime(){
 void sendHistory(){
   server client = server.available();
   response->print("<!DOCTYPE html><html>");
-  for(int i=0; i<54000; i++){
+  for(int i=0; i<TOTALENTRIES; i++){
     response->print(String(regtime[i])+";"+String(regtemp[i], 2)+";"+String(reghum[i], 2)+";"+String(regpres[i], 2)+";"+String(regpol[i])+"\n");
   }
   response->print("</body></html>");
@@ -419,21 +786,8 @@ public:
     }
     request->send_P(200, "text/html", settime_html);
   });
-  server.on("/time.html", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send_P(200, "text/html", settime_html, processor);
-    if (request->hasParam("set_millis=")) {
-      acquiredTime = request->getParam("set_millis=")->value().toInt();
-      update_time();
-      Serial.printf("Millis received: %lu \n", acquiredTime);
-    }
-    request->send_P(200, "text/html", settime_html);
-  });
 
   server.on("/history", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send_P(200, "text/html", "<html>History goes here</html>", processor);
-  });
-
-  server.on("/history.html", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send_P(200, "text/html", "<html>History goes here</html>", processor);
   });
 
@@ -456,11 +810,12 @@ public:
   };
 };
 
-void disableWiFi(){
+inline void disableWiFi() __attribute__((always_inline));
+inline void disableWiFi(){
     WiFi.disconnect(true);  // Disconnect from the network
     WiFi.mode(WIFI_OFF);    // Switch WiFi off
 }
-
+inline void mode_normal() __attribute__((always_inline));
 void mode_normal(){
   schedule_time();
 
@@ -494,14 +849,16 @@ void setupServer() {
 }
 
 void setup() {
-  setCpuFrequencyMhz(80);
+  setCpuFrequencyMhz(160);
+  EEPROM.begin(EEPROM_SIZE);
   Serial.begin(115200);
-  //while (!Serial) {}; // wait for serial port to connect. Needed for native USB port only, easier debugging :P
-  regtemp = (float *) ps_malloc (54000 * sizeof (float));
-  reghum = (float *) ps_malloc (54000 * sizeof (float));
-  regpres = (float *) ps_malloc (54000 * sizeof (float));
-  regpol = (uint32_t *) ps_malloc (54000 * sizeof (unsigned int));
-  regtime = (unsigned long *) ps_malloc (54000 * sizeof (unsigned long));
+  Wire.begin();
+  while (!Serial) {}; // wait for serial port to connect. Needed for native USB port only, easier debugging :P
+  regtemp = (float *) ps_malloc (TOTALENTRIES * sizeof (float));
+  reghum = (float *) ps_malloc (TOTALENTRIES * sizeof (float));
+  regpres = (float *) ps_malloc (TOTALENTRIES * sizeof (float));
+  regpol = (uint16_t *) ps_malloc (TOTALENTRIES * sizeof (unsigned int));
+  regtime = (unsigned long *) ps_malloc (TOTALENTRIES * sizeof (unsigned long));
   if(psramInit()){
     Serial.println("\nPSRAM is correctly initialized");
   }else{
@@ -512,11 +869,16 @@ void setup() {
 
   setenv("TZ", "EET-2EEST,M3.5.0/3,M10.5.0/4", 1); // Timezone set to Helsinki
   tzset();
-  
-  Wire.begin(); //Join I2C bus
+      Serial.println("Trying to set Wire and I2C modules");
+  //Wire.begin();
+  bmp280.begin();
   //Check if the AHT20 will acknowledge
-  if (aht20.begin() == false){Serial.println("AHT20 not detected. Please check wiring. Freezing.");while (1);}
-  Serial.println("AHT20 acknowledged.");
+  if (aht20.begin() == false){Serial.println("AHT20 not detected. Please check wiring.");} else {Serial.println("AHT20 acknowledged.");}
+  if( !ens160.begin() ){Serial.println("Could not communicate with the ENS160, check wiring.");}
+  ens160.setOperatingMode(SFE_ENS160_RESET);
+  ens160.setOperatingMode(SFE_ENS160_STANDARD);
+	
+  
   update_params();
 
   WiFi.mode(WIFI_AP);
@@ -539,22 +901,11 @@ void setup() {
 
 
   //Setup for the BMP280 sensor
-    unsigned status;
-  //status = bmp280.begin(BMP280_ADDRESS_ALT, BMP280_CHIPID);
-  /* When the BMP280 is around...
-  status = bmp280.begin();
-  if (!status) {
-    Serial.println(F("Could not find a valid BMP280 sensor, check wiring or "
-                      "try a different address!"));
-    Serial.print("SensorID was: 0x"); Serial.println(bmp280.sensorID(),16);
-    Serial.print("        ID of 0xFF probably means a bad address, a BMP 180 or BMP 085\n");
-    Serial.print("   ID of 0x56-0x58 represents a BMP 280,\n");
-    Serial.print("        ID of 0x60 represents a BME 280.\n");
-    Serial.print("        ID of 0x61 represents a BME 680.\n");
-    while (1) delay(10);
-  }
-    */
+  //  unsigned status;
   
+  //status = bmp280.begin(BMP280_ADDRESS_ALT, BMP280_CHIPID);
+  /* When the BMP280 is around... */
+
   /* Default settings from datasheet. */
   //bmp280.setSampling(Adafruit_BMP280::MODE_NORMAL,     /* Operating Mode. */
   //                Adafruit_BMP280::SAMPLING_X2,     /* Temp. oversampling */
