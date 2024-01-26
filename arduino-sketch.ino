@@ -6,12 +6,15 @@
 #include "AsyncUDP.h"
 #include <SPI.h>
 #include <AHT20.h>
-#include <DFRobot_ENS160.h>
-#include <Adafruit_BMP280.h>
+#include "SparkFun_ENS160.h"
 
 #include <Wire.h>
 
 #define TOTALENTRIES 57600
+
+#define AHT21_ADDRESS 0x38
+#define ENS160_ADDRESS 0x53
+#define BMP280_ADDRESS 0x76
 
 DNSServer dnsServer;
 AsyncWebServer server(80);
@@ -37,29 +40,34 @@ bool midnight_trigger = false;
 bool wifi_on = false;
 
 AHT20 aht20;
+
+
+/*
+#define SCK    35 //SCL
+#define MISO   37 //SDO
+#define MOSI   33 //SDA
+#define BMP_CS 18 //CSB
+#define ENS_CS 16 //CSB
+*/
+
+//ENS160 TVOC sensor stuff
+/*
+#define ENS_SCK  (35) //SCL
+#define ENS_MISO (37) //SDO
+#define ENS_MOSI (33) //SDA
+#define ENS_CS   (16) //CSB
+*/
+//SparkFun_ENS160_SPI ens160(ENS_CS, ENS_MOSI, ENS_MISO, ENS_SCK);
+SparkFun_ENS160 ENS160;
+
+
+
 float temperature;
 float humidity;
 float pressure;
-float pollution;
+uint16_t pollution;
 
 
-
-#define BMP_SCK  (35) //SCL
-#define BMP_MISO (18) //SDO
-#define BMP_MOSI (33) //SDA
-#define BMP_CS   (37) //CSB
-
-//Adafruit_BMP280 bmp280; // I2C
-//Adafruit_BMP280 bmp(BMP_CS); // hardware SPI
-Adafruit_BMP280 bmp280(BMP_CS, BMP_MOSI, BMP_MISO, BMP_SCK);
-
-//ENS160 TVOC sensor stuff
-#define ENS_SCK  (35) //SCL
-#define ENS_MISO (39) //SDO
-#define ENS_MOSI (33) //SDA
-#define ENS_CS   (16) //CSB
-//SparkFun_ENS160_SPI ens160(ENS_CS, ENS_MOSI, ENS_MISO, ENS_SCK);
-DFRobot_ENS160_SPI ENS160(&SPI, ENS_CS);
 
 /*
 int week_f(int i){
@@ -215,7 +223,7 @@ void update_time(){
   if(previousTime = 0){
     previousTime = millis();
   };
-  for(int i = 0; i < 54000; i++){
+  for(int i = 0; i < TOTALENTRIES; i++){
     regtime[i]+= (acquiredTime - previousTime);
   };
   tv.tv_sec = acquiredTime;
@@ -244,21 +252,26 @@ void update_params(){
    *   ENS160_IDLE_MODE: IDLE mode (low-power)
    *   ENS160_STANDARD_MODE: STANDARD Gas Sensing Modes
    */
-  ENS160.setPWRMode(ENS160_STANDARD_MODE);
+  //ENS160.setPWRMode(ENS160_STANDARD_MODE);
   //add any sensor measurement here
-  digitalWrite(ENS_CS, LOW);
+  //digitalWrite(ENS_CS, LOW);
   temperature = aht20.getTemperature();
   humidity = aht20.getHumidity();
-  ENS160.setTempAndHum(temperature, humidity);
+  //ENS160.setTempAndHum(temperature, humidity);
   pollution = ENS160.getTVOC();
-  ENS160.setPWRMode(ENS160_SLEEP_MODE);
-  digitalWrite(ENS_CS, HIGH);
-  digitalWrite(BMP_CS, LOW);
+  //ENS160.setPWRMode(ENS160_SLEEP_MODE);
+  //digitalWrite(ENS_CS, HIGH);
+  //digitalWrite(BMP_CS, LOW);
   pressure = bmp280.readPressure();
-  digitalWrite(BMP_CS, HIGH);
+  //digitalWrite(BMP_CS, HIGH);
   Serial.println("New measurement");
-  Serial.printf("Temperature = %.2f ℃ \n", temperature);
-  Serial.printf("Humidity = %.2f % \n", humidity);
+  Serial.printf("Temperature = %.2f °C", temperature);
+    Serial.println();
+  Serial.printf("Humidity = %.2f %", humidity);
+    Serial.println();
+  Serial.printf("Pressure = %.2f %", pressure);
+    Serial.println();
+  Serial.printf("TVOC = %u %", (unsigned int)humidity);
   Serial.println();
   save_entry(temperature, humidity, pressure, pollution);
 
@@ -547,7 +560,7 @@ function sendTime(){
 void sendHistory(){
   server client = server.available();
   response->print("<!DOCTYPE html><html>");
-  for(int i=0; i<54000; i++){
+  for(int i=0; i<TOTALENTRIES; i++){
     response->print(String(regtime[i])+";"+String(regtemp[i], 2)+";"+String(reghum[i], 2)+";"+String(regpres[i], 2)+";"+String(regpol[i])+"\n");
   }
   response->print("</body></html>");
@@ -634,14 +647,14 @@ void setup() {
   setCpuFrequencyMhz(80);
   EEPROM.begin(EEPROM_SIZE);
   Serial.begin(115200);
-  pinMode(BMP_CS, OUTPUT);
-  pinMode(ENS_CS, OUTPUT);
+  //pinMode(BMP_CS, OUTPUT);
+  //pinMode(ENS_CS, OUTPUT);
   while (!Serial) {}; // wait for serial port to connect. Needed for native USB port only, easier debugging :P
-  regtemp = (float *) ps_malloc (54000 * sizeof (float));
-  reghum = (float *) ps_malloc (54000 * sizeof (float));
-  regpres = (float *) ps_malloc (54000 * sizeof (float));
-  regpol = (uint16_t *) ps_malloc (54000 * sizeof (unsigned int));
-  regtime = (unsigned long *) ps_malloc (54000 * sizeof (unsigned long));
+  regtemp = (float *) ps_malloc (TOTALENTRIES * sizeof (float));
+  reghum = (float *) ps_malloc (TOTALENTRIES * sizeof (float));
+  regpres = (float *) ps_malloc (TOTALENTRIES * sizeof (float));
+  regpol = (uint16_t *) ps_malloc (TOTALENTRIES * sizeof (unsigned int));
+  regtime = (unsigned long *) ps_malloc (TOTALENTRIES * sizeof (unsigned long));
   if(psramInit()){
     Serial.println("\nPSRAM is correctly initialized");
   }else{
@@ -652,7 +665,7 @@ void setup() {
 
   setenv("TZ", "EET-2EEST,M3.5.0/3,M10.5.0/4", 1); // Timezone set to Helsinki
   tzset();
-  
+      Serial.println("Trying to set Wire and I2C modules");
   Wire.begin(); //Join I2C bus
   //Check if the AHT20 will acknowledge
   if (aht20.begin() == false){Serial.println("AHT20 not detected. Please check wiring.");} else {Serial.println("AHT20 acknowledged.");}
@@ -680,7 +693,8 @@ void setup() {
 
   //Setup for the BMP280 sensor
     unsigned status;
-  status = bmp280.begin(BMP280_ADDRESS_ALT, BMP280_CHIPID);
+  
+  //status = bmp280.begin(BMP280_ADDRESS_ALT, BMP280_CHIPID);
   /* When the BMP280 is around... */
   status = bmp280.begin();
   if (!status) {
@@ -691,7 +705,7 @@ void setup() {
     Serial.print("   ID of 0x56-0x58 represents a BMP 280,\n");
     Serial.print("        ID of 0x60 represents a BME 280.\n");
     Serial.print("        ID of 0x61 represents a BME 680.\n");
-    while (1) delay(10);
+    //while (1) delay(10);
   }
   
   /* Default settings from datasheet. */
