@@ -4,17 +4,17 @@
 #include <ESPAsyncWebServer.h>
 #include <time.h>
 #include "AsyncUDP.h"
-#include <SPI.h>
+//#include <SPI.h>
 #include <AHT20.h>
 #include "SparkFun_ENS160.h"
-
 #include <Wire.h>
+#include <EEPROM.h>
 
 #define TOTALENTRIES 57600
 
-#define AHT21_ADDRESS 0x38
-#define ENS160_ADDRESS 0x53
-#define BMP280_ADDRESS 0x76
+//#define AHT21_ADDRESS 0x38
+//#define ENS160_ADDRESS 0x53
+//#define BMP280_ADDRESS 0x76
 
 DNSServer dnsServer;
 AsyncWebServer server(80);
@@ -39,7 +39,7 @@ bool wifi_on = false;
 
 AHT20 aht20;
 
-SparkFun_ENS160 ENS160;
+SparkFun_ENS160 ens160;
 
 float temperature;
 float humidity;
@@ -47,6 +47,226 @@ float pressure;
 uint16_t pollution;
 
 
+
+class BME280_I2C{
+    
+    public:
+
+    const uint8_t ADDRESS = 0x76; //default address is 0x76
+
+    BME280_I2C(){}
+
+    BME280_I2C(const uint8_t& x) : ADDRESS(x) {}
+
+    uint8_t osrs_t = 1;             //Temperature oversampling x 1
+    uint8_t osrs_p = 1;             //Pressure oversampling x 1
+    uint8_t osrs_h = 1;             //Humidity oversampling x 1
+    uint8_t mode = 3;               //Normal mode
+    uint8_t t_sb = 5;               //Tstandby 1000ms
+    uint8_t filter = 0;             //Filter off 
+    uint8_t spi3w_en = 0;           //3-wire SPI Disable
+    
+    unsigned long int hum_raw,temp_raw,pres_raw;
+    signed long int t_fine;
+    double temp_act = 0.0, press_act = 0.0,hum_act=0.0;
+    signed long int temp_cal;
+    unsigned long int press_cal,hum_cal;
+
+    float temperature {0};
+    float pressure {0};
+    float humidity {0};
+
+    void read(){
+        readData();
+          temp_cal = calibration_T(temp_raw);
+          temp_act = (double)temp_cal / 100.0;
+          press_cal = calibration_P(pres_raw);
+          press_act = (double)press_cal / 100.0;
+          hum_cal = calibration_H(hum_raw);
+          hum_act = (double)hum_cal / 1024.0;
+          temperature = (float)temp_act;
+          pressure = (float)press_act;
+          humidity = (float)hum_act;
+    }
+
+    void begin(){
+        //Wire.begin();
+        writeReg(0xF2,ctrl_hum_reg);
+        writeReg(0xF4,ctrl_meas_reg);
+        writeReg(0xF5,config_reg);
+        
+        //begin Trim
+        uint8_t i=0;
+        Wire.beginTransmission(ADDRESS);
+        Wire.write(0x88);
+        Wire.endTransmission();
+        Wire.requestFrom(ADDRESS,24);
+        while(Wire.available()){
+            data[i] = Wire.read();
+            i++;
+        }
+            
+        Wire.beginTransmission(ADDRESS);
+        Wire.write(0xA1);
+        Wire.endTransmission();
+        Wire.requestFrom(ADDRESS,1);
+        data[i] = Wire.read();
+        i++;
+        
+        Wire.beginTransmission(ADDRESS);
+        Wire.write(0xE1);
+        Wire.endTransmission();
+        Wire.requestFrom(ADDRESS,7);
+        while(Wire.available()){
+            data[i] = Wire.read();
+            i++;    
+        }
+        dig_T1 = (data[1] << 8) | data[0];
+        dig_T2 = (data[3] << 8) | data[2];
+        dig_T3 = (data[5] << 8) | data[4];
+        dig_P1 = (data[7] << 8) | data[6];
+        dig_P2 = (data[9] << 8) | data[8];
+        dig_P3 = (data[11]<< 8) | data[10];
+        dig_P4 = (data[13]<< 8) | data[12];
+        dig_P5 = (data[15]<< 8) | data[14];
+        dig_P6 = (data[17]<< 8) | data[16];
+        dig_P7 = (data[19]<< 8) | data[18];
+        dig_P8 = (data[21]<< 8) | data[20];
+        dig_P9 = (data[23]<< 8) | data[22];
+        dig_H1 = data[24];
+        dig_H2 = (data[26]<< 8) | data[25];
+        dig_H3 = data[27];
+        dig_H4 = (data[28]<< 4) | (0x0F & data[29]);
+        dig_H5 = (data[30]<< 4) | ((data[29] >> 4) & 0x0F);
+        dig_H6 = data[31];
+        
+    }
+
+    float getTemperature(){ //returns temperature in ºC
+        readData();
+        temp_cal = calibration_T(temp_raw);
+        temp_act = (double)temp_cal / 100.0;
+        return((float)temp_act);
+    }
+
+    float getPressure(){ //returns pressure in hPa
+        readData();
+        press_cal = calibration_P(pres_raw);
+        press_act = (double)press_cal / 100.0;
+        return((float)press_act);
+    }
+
+    float getHumidity(){ //returns relative atmospheric humidity in %
+        readData();
+        hum_cal = calibration_H(hum_raw);
+        hum_act = (double)hum_cal / 1024.0;
+        return((float)hum_act);
+    }
+    
+    void readData(){
+        //Serial.println("readData() function called");
+        int i = 0;
+        uint32_t data[8];
+        Wire.beginTransmission(ADDRESS);
+        Wire.write(0xF7);
+        Wire.endTransmission();
+        Wire.requestFrom(ADDRESS,8);
+        while(Wire.available()){
+            data[i] = Wire.read();
+            i++;
+        }
+        pres_raw = (data[0] << 12) | (data[1] << 4) | (data[2] >> 4);
+        temp_raw = (data[3] << 12) | (data[4] << 4) | (data[5] >> 4);
+        hum_raw  = (data[6] << 8) | data[7];
+    }
+
+    private:
+        uint8_t data[32];
+
+        uint8_t ctrl_meas_reg = (osrs_t << 5) | (osrs_p << 2) | mode;
+        uint8_t config_reg    = (t_sb << 5) | (filter << 2) | spi3w_en;
+        uint8_t ctrl_hum_reg  = osrs_h;
+
+        uint16_t dig_T1;
+        int16_t dig_T2;
+        int16_t dig_T3;
+        uint16_t dig_P1;
+        int16_t dig_P2;
+        int16_t dig_P3;
+        int16_t dig_P4;
+        int16_t dig_P5;
+        int16_t dig_P6;
+        int16_t dig_P7;
+        int16_t dig_P8;
+        int16_t dig_P9;
+        int8_t  dig_H1;
+        int16_t dig_H2;
+        int8_t  dig_H3;
+        int16_t dig_H4;
+        int16_t dig_H5;
+        int8_t  dig_H6;
+
+        void writeReg(uint8_t reg_address, uint8_t data){
+            Wire.beginTransmission(ADDRESS);
+            Wire.write(reg_address);
+            Wire.write(data);
+            Wire.endTransmission();    
+        }
+
+    signed long int calibration_T(signed long int adc_T)    {        
+        signed long int var1, var2, T;
+        var1 = ((((adc_T >> 3) - ((signed long int)dig_T1<<1))) * ((signed long int)dig_T2)) >> 11;
+        var2 = (((((adc_T >> 4) - ((signed long int)dig_T1)) * ((adc_T>>4) - ((signed long int)dig_T1))) >> 12) * ((signed long int)dig_T3)) >> 14;
+        
+        t_fine = var1 + var2;
+        T = (t_fine * 5 + 128) >> 8;
+        return T; 
+    }
+
+    unsigned long int calibration_P(signed long int adc_P)    {
+        signed long int var1, var2;
+        unsigned long int P;
+        var1 = (((signed long int)t_fine)>>1) - (signed long int)64000;
+        var2 = (((var1>>2) * (var1>>2)) >> 11) * ((signed long int)dig_P6);
+        var2 = var2 + ((var1*((signed long int)dig_P5))<<1);
+        var2 = (var2>>2)+(((signed long int)dig_P4)<<16);
+        var1 = (((dig_P3 * (((var1>>2)*(var1>>2)) >> 13)) >>3) + ((((signed long int)dig_P2) * var1)>>1))>>18;
+        var1 = ((((32768+var1))*((signed long int)dig_P1))>>15);
+        if (var1 == 0)
+        {
+            return 0;
+        }    
+        P = (((unsigned long int)(((signed long int)1048576)-adc_P)-(var2>>12)))*3125;
+        if(P<0x80000000)
+        {
+        P = (P << 1) / ((unsigned long int) var1);   
+        }
+        else
+        {
+            P = (P / (unsigned long int)var1) * 2;    
+        }
+        var1 = (((signed long int)dig_P9) * ((signed long int)(((P>>3) * (P>>3))>>13)))>>12;
+        var2 = (((signed long int)(P>>2)) * ((signed long int)dig_P8))>>13;
+        P = (unsigned long int)((signed long int)P + ((var1 + var2 + dig_P7) >> 4));
+        return P;
+    }
+
+    unsigned long int calibration_H(signed long int adc_H)    {
+        signed long int v_x1;        
+        v_x1 = (t_fine - ((signed long int)76800));
+        v_x1 = (((((adc_H << 14) -(((signed long int)dig_H4) << 20) - (((signed long int)dig_H5) * v_x1)) + 
+        ((signed long int)16384)) >> 15) * (((((((v_x1 * ((signed long int)dig_H6)) >> 10) * 
+        (((v_x1 * ((signed long int)dig_H3)) >> 11) + ((signed long int) 32768))) >> 10) + (( signed long int)2097152)) * 
+        ((signed long int) dig_H2) + 8192) >> 14));
+        v_x1 = (v_x1 - (((((v_x1 >> 15) * (v_x1 >> 15)) >> 7) * ((signed long int)dig_H1)) >> 4));
+        v_x1 = (v_x1 < 0 ? 0 : v_x1);
+        v_x1 = (v_x1 > 419430400 ? 419430400 : v_x1);
+        return (unsigned long int)(v_x1 >> 12);   
+    }
+};
+
+
+BME280_I2C bmp280;
 
 /*
 int week_f(int i){
@@ -100,24 +320,12 @@ inline void rtc_alloc(){
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 // END OF NEW LOW POWER FUNCTIONS
 
 
 
 //EEPROM FUNCTIONS
-#include <EEPROM.h>
+
 #define EEPROM_SIZE 3145728 //size of the flash memory to be reserved. 3145728 = 3MB
 
 void store_measurement(uint16_t step){
@@ -220,7 +428,7 @@ void save_entry(float val0, float val1, float val2, uint16_t val3){
   regpol[step] = val3;
   regtime[step] = millis();
   step++;
-  if(step > 53999){step = 0;};
+  if(step > TOTALENTRIES){step = 0;};
 }
 
 void update_params(){
@@ -234,12 +442,33 @@ void update_params(){
   //ENS160.setPWRMode(ENS160_STANDARD_MODE);
   //add any sensor measurement here
   //digitalWrite(ENS_CS, LOW);
-  temperature = aht20.getTemperature();
+  //temperature = aht20.getTemperature();
   humidity = aht20.getHumidity();
   //ENS160.setTempAndHum(temperature, humidity);
-  pollution = ENS160.getTVOC();
+  
+  
+    ens160.checkDataStatus();
+	
+		Serial.print("Air Quality Index (1-5) : ");
+		Serial.println(ens160.getAQI());
+
+		Serial.print("Total Volatile Organic Compounds: ");
+		Serial.print(ens160.getTVOC());
+		Serial.println("ppb");
+
+		Serial.print("CO2 concentration: ");
+		Serial.print(ens160.getECO2());
+		Serial.println("ppm");
+    pollution = ens160.getTVOC();
+  
+  
+  
+  
   //ENS160.setPWRMode(ENS160_SLEEP_MODE);
-  pressure = bmp280.readPressure();
+  //pressure = bmp280.readPressure();
+  bmp280.read();
+  temperature = bmp280.temperature;
+  pressure = bmp280.pressure;
   Serial.println("New measurement");
   Serial.printf("Temperature = %.2f °C", temperature);
     Serial.println();
@@ -247,9 +476,9 @@ void update_params(){
     Serial.println();
   Serial.printf("Pressure = %.2f %", pressure);
     Serial.println();
-  Serial.printf("TVOC = %u %", (unsigned int)humidity);
+  Serial.printf("TVOC = %u %", pollution);
   Serial.println();
-  save_entry(temperature, humidity, pressure, pollution);
+  //save_entry(temperature, humidity, pressure, pollution);
 
 
 
@@ -620,11 +849,10 @@ void setupServer() {
 }
 
 void setup() {
-  setCpuFrequencyMhz(80);
+  setCpuFrequencyMhz(160);
   EEPROM.begin(EEPROM_SIZE);
   Serial.begin(115200);
-  //pinMode(BMP_CS, OUTPUT);
-  //pinMode(ENS_CS, OUTPUT);
+  Wire.begin();
   while (!Serial) {}; // wait for serial port to connect. Needed for native USB port only, easier debugging :P
   regtemp = (float *) ps_malloc (TOTALENTRIES * sizeof (float));
   reghum = (float *) ps_malloc (TOTALENTRIES * sizeof (float));
@@ -642,9 +870,14 @@ void setup() {
   setenv("TZ", "EET-2EEST,M3.5.0/3,M10.5.0/4", 1); // Timezone set to Helsinki
   tzset();
       Serial.println("Trying to set Wire and I2C modules");
-  Wire.begin(); //Join I2C bus
+  //Wire.begin();
+  bmp280.begin();
   //Check if the AHT20 will acknowledge
   if (aht20.begin() == false){Serial.println("AHT20 not detected. Please check wiring.");} else {Serial.println("AHT20 acknowledged.");}
+  if( !ens160.begin() ){Serial.println("Could not communicate with the ENS160, check wiring.");}
+  ens160.setOperatingMode(SFE_ENS160_RESET);
+  ens160.setOperatingMode(SFE_ENS160_STANDARD);
+	
   
   update_params();
 
@@ -668,22 +901,11 @@ void setup() {
 
 
   //Setup for the BMP280 sensor
-    unsigned status;
+  //  unsigned status;
   
   //status = bmp280.begin(BMP280_ADDRESS_ALT, BMP280_CHIPID);
   /* When the BMP280 is around... */
-  status = bmp280.begin();
-  if (!status) {
-    Serial.println(F("Could not find a valid BMP280 sensor, check wiring or "
-                      "try a different address!"));
-    Serial.print("SensorID was: 0x"); Serial.println(bmp280.sensorID(),16);
-    Serial.print("        ID of 0xFF probably means a bad address, a BMP 180 or BMP 085\n");
-    Serial.print("   ID of 0x56-0x58 represents a BMP 280,\n");
-    Serial.print("        ID of 0x60 represents a BME 280.\n");
-    Serial.print("        ID of 0x61 represents a BME 680.\n");
-    //while (1) delay(10);
-  }
-  
+
   /* Default settings from datasheet. */
   //bmp280.setSampling(Adafruit_BMP280::MODE_NORMAL,     /* Operating Mode. */
   //                Adafruit_BMP280::SAMPLING_X2,     /* Temp. oversampling */
