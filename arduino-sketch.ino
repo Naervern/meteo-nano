@@ -25,8 +25,6 @@ AsyncEventSource events("/events");
 unsigned long lastTime = 0;   
 unsigned long timerDelay = 30000;
 
-//unsigned long regtime[52600] = {0};
-//float regtab[52600][4] = {0.0};
 float * regtemp;
 float * reghum;
 float * regpres;
@@ -41,26 +39,7 @@ bool wifi_on = false;
 
 AHT20 aht20;
 
-
-/*
-#define SCK    35 //SCL
-#define MISO   37 //SDO
-#define MOSI   33 //SDA
-#define BMP_CS 18 //CSB
-#define ENS_CS 16 //CSB
-*/
-
-//ENS160 TVOC sensor stuff
-/*
-#define ENS_SCK  (35) //SCL
-#define ENS_MISO (37) //SDO
-#define ENS_MOSI (33) //SDA
-#define ENS_CS   (16) //CSB
-*/
-//SparkFun_ENS160_SPI ens160(ENS_CS, ENS_MOSI, ENS_MISO, ENS_SCK);
 SparkFun_ENS160 ENS160;
-
-
 
 float temperature;
 float humidity;
@@ -231,7 +210,7 @@ void update_time(){
 
 
 
-void save_entry(float val0, float val1, float val2, float val3){
+void save_entry(float val0, float val1, float val2, uint16_t val3){
 
   // This function saves entries to the next 
 
@@ -260,10 +239,7 @@ void update_params(){
   //ENS160.setTempAndHum(temperature, humidity);
   pollution = ENS160.getTVOC();
   //ENS160.setPWRMode(ENS160_SLEEP_MODE);
-  //digitalWrite(ENS_CS, HIGH);
-  //digitalWrite(BMP_CS, LOW);
   pressure = bmp280.readPressure();
-  //digitalWrite(BMP_CS, HIGH);
   Serial.println("New measurement");
   Serial.printf("Temperature = %.2f °C", temperature);
     Serial.println();
