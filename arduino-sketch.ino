@@ -10,11 +10,13 @@
 #include <Wire.h>
 #include <EEPROM.h>
 
-#define TOTALENTRIES 57600
+#define TIMERDELAY 30    // Delay between measurements in seconds
+#define TOTALENTRIES 57600  // Total entries to be stored in the EEPROM
+#define DAILYENTRIES 144    // How many measurements expected to be done during a day. If every 24h/10min = 144
 
-//#define AHT21_ADDRESS 0x38
-//#define ENS160_ADDRESS 0x53
-//#define BMP280_ADDRESS 0x76
+#define AHT21_ADDRESS 0x38
+#define ENS160_ADDRESS 0x53
+#define BMP280_ADDRESS 0x76
 
 DNSServer dnsServer;
 AsyncWebServer server(80);
@@ -22,16 +24,16 @@ AsyncWebServer server(80);
 //AsyncWebServer historyserver(80);
 AsyncEventSource events("/events");
 
-unsigned long lastTime = 0;   
-unsigned long timerDelay = 30000;
+RTC_SLOW_ATTR unsigned long lastTime = 0;   
+const unsigned long timerDelay = 30000;
 
-float * regtemp;
-float * reghum;
-float * regpres;
-uint16_t * regpol;
-unsigned long * regtime;
+RTC_SLOW_ATTR float * regtemp;
+RTC_SLOW_ATTR float * reghum;
+RTC_SLOW_ATTR float * regpres;
+RTC_SLOW_ATTR uint16_t * regpol;
+RTC_SLOW_ATTR unsigned long * regtime;
 //ps_malloc();
-uint16_t step = 0; //iterator for the regtab array. It keeps track of what's the next measurement to be stored.
+RTC_SLOW_ATTR uint32_t step = 0; //iterator for the regtab array. It keeps track of what's the next measurement to be stored.
 
 bool measurement_trigger = false;
 bool midnight_trigger = false;
@@ -282,14 +284,15 @@ RTC_SLOW_ATTR struct timeval tv;
 RTC_SLOW_ATTR unsigned long acquiredTime = 0;
 RTC_SLOW_ATTR unsigned long previousTime = 0;
 
-RTC_FAST_ATTR float histtemperaturemax[7] = {0.0};
-RTC_FAST_ATTR float histtemperaturemin[7] = {0.0};
-RTC_FAST_ATTR float histhumiditymax[7] = {404.0, 404.1, 404.2, 404.3, 404.4, 404.5, 404.6};
-RTC_FAST_ATTR float histhumiditymin[7] = {404.0, 404.1, 404.2, 404.3, 404.4, 404.5, 404.6};
-RTC_FAST_ATTR float histpressure[7] = {1404.0, 1404.1, 1404.2, 1404.3, 1404.4, 1404.5, 1404.6};
-RTC_FAST_ATTR uint16_t histpollution[7] = {0};
+  //placeholder values that will be replaced by any realistic measurement
+RTC_FAST_ATTR float histtemperaturemax[7] = {[0 . . . 6]= -404.0};
+RTC_FAST_ATTR float histtemperaturemin[7] = {[0 . . . 6]=404.0};
+RTC_FAST_ATTR float histhumiditymax[7] = {[0 . . . 6]= -404.0};
+RTC_FAST_ATTR float histhumiditymin[7] = {[0 . . . 6]= 404.1};
+RTC_FAST_ATTR float histpressure[7] = {[0 . . . 6]= 4040.2};
+RTC_FAST_ATTR uint16_t histpollution[7] = {[0 . . . 6]= 0};
 
-
+  //these will all be used for the arrays
 RTC_SLOW_ATTR float * d_temp;
 RTC_SLOW_ATTR float * d_hum;
 RTC_SLOW_ATTR float * d_pres;
@@ -297,7 +300,8 @@ RTC_SLOW_ATTR uint16_t * d_pol;
 RTC_SLOW_ATTR unsigned long * d_time;
 RTC_SLOW_ATTR uint8_t d_10m_step = 0;
 
-RTC_SLOW_ATTR uint8_t week_it = 0;
+RTC_SLOW_ATTR uint8_t week_it = 0; // iterates over the 7-long "hist" arrays over the week
+RTC_SLOW_ATTR uint8_t week_acq = 0; // learns the "day zero" for the iterator above
 
 /*
 RTC_FAST_ATTR float weektemp_h;
@@ -310,11 +314,21 @@ RTC_FAST_ATTR unsigned long weektime;
 */
 
 inline void rtc_alloc(){
-  d_temp = (float *) malloc (144 * sizeof (float));
-  d_hum = (float *) malloc (144 * sizeof (float));
-  d_pres = (float *) malloc (144 * sizeof (float));
-  d_pol = (uint16_t *) malloc (144 * sizeof (uint16_t));
-  d_time = (unsigned long *) malloc (144 * sizeof (unsigned long));
+  d_temp = (float *) malloc (DAILYENTRIES * sizeof (float));
+  d_hum = (float *) malloc (DAILYENTRIES * sizeof (float));
+  d_pres = (float *) malloc (DAILYENTRIES * sizeof (float));
+  d_pol = (uint16_t *) malloc (DAILYENTRIES * sizeof (uint16_t));
+  d_time = (unsigned long *) malloc (DAILYENTRIES * sizeof (unsigned long));
+
+}
+
+void store_week_data(float temp, float hum, float pres, uint16_t tvoc){
+  if (temp > histtemperaturemax[week_it]) histtemperaturemax[week_it] = temp;
+  if (temp < histtemperaturemin[week_it]) histtemperaturemin[week_it] = temp;
+  if (hum > histhumiditymax[week_it]) histhumiditymax[week_it] = hum;
+  if (hum < histhumiditymin[week_it]) histhumiditymin[week_it] = hum;
+  if (pres < histpressure[week_it]) histpressure[week_it] = pres;
+  if (tvoc > histpollution[week_it]) histpollution[week_it] = tvoc;  
 }
 
 
@@ -330,39 +344,15 @@ inline void rtc_alloc(){
 
 void store_measurement(uint16_t step){
   byte byteARR[18] = {0xFF};
-  for (uint8_t i=0; i<144; i++){
-    EEPROM.put(step+i-16, d_time[i]); //reserving the first 128 bytes of EEPROM for reasons
-    EEPROM.put(step+i-12, d_temp[i]);
-    EEPROM.put(step+i-8, d_hum[i]);
-    EEPROM.put(step+i-4, d_pres[i]);
-    EEPROM.put(step+i, d_pol[i]);
-    /*
-    byteARR[18] = {
-      d_temp[i] >> 24;
-      d_temp[i] >> 16;
-      d_temp[i] >> 8;
-      d_temp[i] & 0xFF;
-      d_hum[i] >> 24;
-      d_hum[i] >> 16;
-      d_hum[i] >> 8;
-      d_hum[i] & 0xFF;
-      d_pres[i] >> 24;
-      d_pres[i] >> 16;
-      d_pres[i] >> 8;
-      d_pres[i] & 0xFF;
-      d_pol[i] >> 8;
-      d_pol[i] & 0xFF;
-      d_time[i] >> 24;
-      d_time[i] >> 16;
-      d_time[i] >> 8;
-      d_time[i] & 0xFF;
-     };
-    for (uint8_t j=0; j<18; j++){
-      EEPROM.write(18*step+18*i+j, byteARR[j]);
-      };
-    */
-  };
 
+  for (uint8_t i=0; i<DAILYENTRIES; i++){             //reserving the first 128 bytes of EEPROM for reasons
+    //18*( step - DAILYENTRIES + i + 1 ) + 128 -> for the start. This is called for the first time when the value of variable step is 144.
+    EEPROM.put(18*(step+i-DAILYENTRIES)+146, d_time[i]);   //first variable, 4 bytes (unsigned long) - UNIX time
+    EEPROM.put(18*(step+i-DAILYENTRIES)+150, d_temp[i]);   //second variable, 4 bytes (float) - temperature in degC
+    EEPROM.put(18*(step+i-DAILYENTRIES)+154, d_hum[i]);    //second variable, 4 bytes (float) - humidity in %
+    EEPROM.put(18*(step+i-DAILYENTRIES)+158, d_pres[i]);   //second variable, 4 bytes (float) - pressure in hPa
+    EEPROM.put(18*(step+i-DAILYENTRIES)+160, d_pol[i]);    //second variable, 4 bytes (uint16_t) - TVOC in ppb
+  };
 }
 
 class readEntry {
@@ -374,13 +364,28 @@ class readEntry {
     uint16_t pol;
   
   void get_measurement (uint16_t pas){
-    EEPROM.get(pas+128, tim); //reserving the first 128 bytes of EEPROM for reasons
-    EEPROM.get(pas+132, temp);
-    EEPROM.get(pas+136, hum);
-    EEPROM.get(pas+140, pres);
-    EEPROM.get(pas+142, pol);
+    EEPROM.get(18*pas+128, tim); //reserving the first 128 bytes of EEPROM for reasons
+    EEPROM.get(18*pas+132, temp);
+    EEPROM.get(18*pas+136, hum);
+    EEPROM.get(18*pas+140, pres);
+    EEPROM.get(18*pas+142, pol);
   }
 };
+
+// This function will find how many entries are already stored in the EEPROM and increment the "step" iterator.
+// It is very important to preserve past measurements and resume properly if the system is powered down.
+RTC_FAST_ATTR uint32_t counter = 0, value = 0;
+void get_stored_data_length(){
+  counter = 0, value = 0;
+    while(true) {
+        EEPROM.get(18*counter+128, value);
+        Serial.printf("Checked the block");
+        Serial.println(counter);
+        if (value != 0xffffffff) {break;}
+        counter++;
+    }
+  step = counter;
+}
 
 /*
 void get_measurement (uint16_t pas){
@@ -432,21 +437,12 @@ void save_entry(float val0, float val1, float val2, uint16_t val3){
 }
 
 void update_params(){
-  /**
-   * Set power mode
-   * mode Configurable power mode:
-   *   ENS160_SLEEP_MODE: DEEP SLEEP mode (low power standby)
-   *   ENS160_IDLE_MODE: IDLE mode (low-power)
-   *   ENS160_STANDARD_MODE: STANDARD Gas Sensing Modes
-   */
-  //ENS160.setPWRMode(ENS160_STANDARD_MODE);
-  //add any sensor measurement here
   //digitalWrite(ENS_CS, LOW);
   //temperature = aht20.getTemperature();
   humidity = aht20.getHumidity();
   //ENS160.setTempAndHum(temperature, humidity);
   
-  
+    //ens160.setOperatingMode(0x02);
     ens160.checkDataStatus();
 	
 		Serial.print("Air Quality Index (1-5) : ");
@@ -460,15 +456,14 @@ void update_params(){
 		Serial.print(ens160.getECO2());
 		Serial.println("ppm");
     pollution = ens160.getTVOC();
-  
-  
-  
-  
+    //ens160.setOperatingMode(0x00);
+    
   //ENS160.setPWRMode(ENS160_SLEEP_MODE);
   //pressure = bmp280.readPressure();
   bmp280.read();
   temperature = bmp280.temperature;
   pressure = bmp280.pressure;
+
   Serial.println("New measurement");
   Serial.printf("Temperature = %.2f °C", temperature);
     Serial.println();
@@ -488,15 +483,12 @@ void schedule_time(){
   //Serial.printf("time(null) value: %d \n", time(NULL));//debug stuff
   //Serial.println(measurement_trigger == true); //debug stuff
 
-  if((time(NULL) % 30) == 0 && measurement_trigger == true) {
+  if((time(NULL) / TIMERDELAY) > 1 && measurement_trigger == true) {
     update_params();
+    store_week_data(temperature, humidity, pressure, pollution);
     measurement_trigger = false;
-    Serial.println("Attempting to send events"); //debug stuff
-    events.send("ping",NULL,millis());
-    events.send(String(temperature).c_str(),"temperature",millis());
-    events.send(String(humidity).c_str(),"humidity",millis());
   };
-  if ((time(NULL) % 30) > 15 && (time(NULL) % 30) < 20 && measurement_trigger == false)
+  if ((time(NULL) % TIMERDELAY) > 15 && (time(NULL) % TIMERDELAY) < 20 && measurement_trigger == false)
   {
     measurement_trigger = true;
   };
@@ -817,8 +809,9 @@ inline void disableWiFi(){
 }
 inline void mode_normal() __attribute__((always_inline));
 void mode_normal(){
+  ens160.setOperatingMode(0x00);
   schedule_time();
-
+  ens160.setOperatingMode(0x02);
   dnsServer.processNextRequest();
   //events.send(String(pressure).c_str(),"pressure",millis());
 }
@@ -849,7 +842,7 @@ void setupServer() {
 }
 
 void setup() {
-  setCpuFrequencyMhz(160);
+  setCpuFrequencyMhz(240);
   EEPROM.begin(EEPROM_SIZE);
   Serial.begin(115200);
   Wire.begin();
@@ -865,26 +858,30 @@ void setup() {
     Serial.println("PSRAM not available");
   }
 
+  Serial.println("Beginning EEPROM discovery");
+  get_stored_data_length(); //discovers how many rows were saved in the EEPROM already, then continues from the first empty space.
+  Serial.printf("A total of %u entries have been discovered in the EEPROM\n", step);
   Serial.println();
+
+  setCpuFrequencyMhz(80);
 
   setenv("TZ", "EET-2EEST,M3.5.0/3,M10.5.0/4", 1); // Timezone set to Helsinki
   tzset();
-      Serial.println("Trying to set Wire and I2C modules");
-  //Wire.begin();
   bmp280.begin();
-  //Check if the AHT20 will acknowledge
   if (aht20.begin() == false){Serial.println("AHT20 not detected. Please check wiring.");} else {Serial.println("AHT20 acknowledged.");}
   if( !ens160.begin() ){Serial.println("Could not communicate with the ENS160, check wiring.");}
   ens160.setOperatingMode(SFE_ENS160_RESET);
   ens160.setOperatingMode(SFE_ENS160_STANDARD);
 	
-  
+
   update_params();
+
 
   WiFi.mode(WIFI_AP);
   WiFi.softAP("WeatherSpot");
   Serial.println("Starting DNS Server");
   dnsServer.start(53, "*", WiFi.softAPIP());
+
 
 
   events.onConnect([](AsyncEventSourceClient *client){
@@ -899,21 +896,6 @@ void setup() {
   server.addHandler(new CaptiveRequestHandler()).setFilter(ON_AP_FILTER);  //only when requested from AP
   server.addHandler(&events);
 
-
-  //Setup for the BMP280 sensor
-  //  unsigned status;
-  
-  //status = bmp280.begin(BMP280_ADDRESS_ALT, BMP280_CHIPID);
-  /* When the BMP280 is around... */
-
-  /* Default settings from datasheet. */
-  //bmp280.setSampling(Adafruit_BMP280::MODE_NORMAL,     /* Operating Mode. */
-  //                Adafruit_BMP280::SAMPLING_X2,     /* Temp. oversampling */
-  //                Adafruit_BMP280::SAMPLING_X16,    /* Pressure oversampling */
-  //                Adafruit_BMP280::FILTER_X16,      /* Filtering. */
-  //                Adafruit_BMP280::STANDBY_MS_500); /* Standby time. */
-  
-  
   setupServer();
 
   server.begin();
@@ -923,20 +905,26 @@ void setup() {
 
 
 void loop() {
-
+  Serial.println();
   dnsServer.processNextRequest();
-  if ((millis() - lastTime) > timerDelay) {
+
+  //void mode_normal();
+
+  if ((millis() - lastTime) > TIMERDELAY * 1000) {
+    ens160.setOperatingMode(0x02);
     update_params();
+    ens160.setOperatingMode(0x02);
+    store_week_data(temperature, humidity, pressure, pollution);
     Serial.println("...");
 
     //Send Events to the Web Client with the Sensor Readings
-    events.send("ping",NULL,millis());
-    events.send(String(temperature).c_str(),"temperature",millis());
-    events.send(String(humidity).c_str(),"humidity",millis());
+    //events.send("ping",NULL,millis());
+    //events.send(String(temperature).c_str(),"temperature",millis());
+    //events.send(String(humidity).c_str(),"humidity",millis());
     //Serial.println("events sent:");
     //Serial.println();
     
     lastTime = millis();
   }
-
+  
 }
