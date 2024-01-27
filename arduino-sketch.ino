@@ -444,6 +444,9 @@ void update_params(){
   
     //ens160.setOperatingMode(0x02);
     ens160.checkDataStatus();
+
+    Serial.print("Gas Sensor Status Flag (0 - Standard, 1 - Warm up, 2 - Initial Start Up): ");
+    Serial.println(ens160.getFlags());
 	
 		Serial.print("Air Quality Index (1-5) : ");
 		Serial.println(ens160.getAQI());
@@ -479,21 +482,6 @@ void update_params(){
 
 }
 
-void schedule_time(){
-  //Serial.printf("time(null) value: %d \n", time(NULL));//debug stuff
-  //Serial.println(measurement_trigger == true); //debug stuff
-
-  if((time(NULL) / TIMERDELAY) > 1 && measurement_trigger == true) {
-    update_params();
-    store_week_data(temperature, humidity, pressure, pollution);
-    measurement_trigger = false;
-  };
-  if ((time(NULL) % TIMERDELAY) > 15 && (time(NULL) % TIMERDELAY) < 20 && measurement_trigger == false)
-  {
-    measurement_trigger = true;
-  };
-}
-
 
 String processor(const String& var){
   
@@ -515,6 +503,8 @@ String processor(const String& var){
 
     else if(var == "PARMS"){ //parameters order = max temperature, min temperature, max humidity, min humidity, average pressure, max pollution.
       String combined = "";
+      //char* combined = "";
+      //char[384] combined;
       for(float i: histtemperaturemax){combined+= String(i, 1) + ",";};
       for(float i: histtemperaturemin){combined+= String(i, 1) + ",";};
       for(float i: histhumiditymax){combined+= String(i, 1) + ",";};
@@ -745,7 +735,7 @@ document.getElementById("date").innerHTML = new Date().getTime();
 function sendTime(){
     var t = new Date().getTime();
     var xhr = new XMLHttpRequest();
-    xhr.open("GET", "/time?set_millis="+ t);
+    xhr.open("GET", "/timesync?set_millis="+ t);
     document.getElementById("date").innerHTML = t;
     xhr.send();
 };
@@ -770,17 +760,19 @@ public:
   CaptiveRequestHandler() {
 
   server.on("/time", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send_P(200, "text/html", settime_html, processor);
+    request->send_P(200, "text/html", settime_html);
+  });
+
+  server.on("/history", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send_P(200, "text/html", "<html>History goes here</html>");
+  });
+
+  server.on("/timesync", HTTP_GET, [](AsyncWebServerRequest *request) {
     if (request->hasParam("set_millis=")) {
       acquiredTime = request->getParam("set_millis=")->value().toInt();
       update_time();
       Serial.printf("Millis received: %lu \n", acquiredTime);
     }
-    request->send_P(200, "text/html", settime_html);
-  });
-
-  server.on("/history", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send_P(200, "text/html", "<html>History goes here</html>", processor);
   });
 
   }
@@ -802,24 +794,27 @@ public:
   };
 };
 
+
 inline void disableWiFi() __attribute__((always_inline));
 inline void disableWiFi(){
     WiFi.disconnect(true);  // Disconnect from the network
     WiFi.mode(WIFI_OFF);    // Switch WiFi off
 }
+
+
 inline void mode_normal() __attribute__((always_inline));
 void mode_normal(){
   ens160.setOperatingMode(0x00);
-  schedule_time();
+  //schedule_time();
   ens160.setOperatingMode(0x02);
   dnsServer.processNextRequest();
   //events.send(String(pressure).c_str(),"pressure",millis());
 }
 
 void setupServer() {
-  /*
-  timeserver.on("/time.html", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send_P(200, "text/html", settime_html, processor);
+  
+  server.on("/time", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send_P(200, "text/html", settime_html);
     if (request->hasParam("set_millis=")) {
       acquiredTime = request->getParam("set_millis=")->value().toInt();
       update_time();
@@ -827,10 +822,13 @@ void setupServer() {
     }
     request->send_P(200, "text/html", settime_html);
   });
-  historyserver.on("/history.html", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send_P(200, "text/html", "<html>History goes here</html>", processor);
+
+  server.on("/history", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send_P(200, "text/html", "<html>History goes here</html>");
   });
-  */
+  
+  server.onNotFound([](AsyncWebServerRequest *request){request->send_P(200, "text/html", index_html, processor);});
+
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
   request->send_P(200, "text/html", index_html, processor);
       if (request->hasParam("set_millis=")) {
@@ -869,10 +867,11 @@ void setup() {
   tzset();
   bmp280.begin();
   if (aht20.begin() == false){Serial.println("AHT20 not detected. Please check wiring.");} else {Serial.println("AHT20 acknowledged.");}
+  ens160.begin();
   if( !ens160.begin() ){Serial.println("Could not communicate with the ENS160, check wiring.");}
   ens160.setOperatingMode(SFE_ENS160_RESET);
   ens160.setOperatingMode(SFE_ENS160_STANDARD);
-	
+  ens160.setOperatingMode(0x02);
 
   update_params();
 
@@ -913,7 +912,7 @@ void loop() {
   if ((millis() - lastTime) > TIMERDELAY * 1000) {
     ens160.setOperatingMode(0x02);
     update_params();
-    ens160.setOperatingMode(0x02);
+    //ens160.setOperatingMode(0x02);
     store_week_data(temperature, humidity, pressure, pollution);
     Serial.println("...");
     Serial.println();

@@ -16,7 +16,7 @@ document.getElementById("date").innerHTML = new Date().getTime();
 function sendTime(){
     var t = new Date().getTime();
     var xhr = new XMLHttpRequest();
-    xhr.open("GET", "/time?set_millis="+ t);
+    xhr.open("GET", "/timesync?set_millis="+ t);
     document.getElementById("date").innerHTML = t;
     xhr.send();
 };
