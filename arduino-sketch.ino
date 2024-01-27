@@ -905,7 +905,7 @@ void setup() {
 
 
 void loop() {
-  Serial.println();
+
   dnsServer.processNextRequest();
 
   //void mode_normal();
@@ -916,6 +916,7 @@ void loop() {
     ens160.setOperatingMode(0x02);
     store_week_data(temperature, humidity, pressure, pollution);
     Serial.println("...");
+    Serial.println();
 
     //Send Events to the Web Client with the Sensor Readings
     //events.send("ping",NULL,millis());
