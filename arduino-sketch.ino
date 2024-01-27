@@ -285,12 +285,12 @@ RTC_SLOW_ATTR unsigned long acquiredTime = 0;
 RTC_SLOW_ATTR unsigned long previousTime = 0;
 
   //placeholder values that will be replaced by any realistic measurement
-RTC_FAST_ATTR float histtemperaturemax[7] = {[0 . . . 6]= -404.0};
-RTC_FAST_ATTR float histtemperaturemin[7] = {[0 . . . 6]=404.0};
-RTC_FAST_ATTR float histhumiditymax[7] = {[0 . . . 6]= -404.0};
-RTC_FAST_ATTR float histhumiditymin[7] = {[0 . . . 6]= 404.1};
-RTC_FAST_ATTR float histpressure[7] = {[0 . . . 6]= 4040.2};
-RTC_FAST_ATTR uint16_t histpollution[7] = {[0 . . . 6]= 0};
+RTC_FAST_ATTR float histtemperaturemax[7] = {-404.0, -404.0, -404.0, -404.0, -404.0, -404.0, -404.0};
+RTC_FAST_ATTR float histtemperaturemin[7] = {404.0, 404.0, 404.0, 404.0, 404.0, 404.0, 404.0};
+RTC_FAST_ATTR float histhumiditymax[7] = {-404.0, -404.0, -404.0, -404.0, -404.0, -404.0, -404.0};
+RTC_FAST_ATTR float histhumiditymin[7] = {404.0, 404.0, 404.0, 404.0, 404.0, 404.0, 404.0};
+RTC_FAST_ATTR float histpressure[7] = {4040.2, 4040.2, 4040.2, 4040.2, 4040.2, 4040.2, 4040.2};
+RTC_FAST_ATTR uint16_t histpollution[7] = {0};
 
   //these will all be used for the arrays
 RTC_SLOW_ATTR float * d_temp;
