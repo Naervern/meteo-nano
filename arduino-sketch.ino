@@ -412,12 +412,14 @@ client.write((const char*)data, 2048);
 */
 
 void update_time(){
+  Serial.println("update time function called");
+  Serial.println(acquiredTime);
   if(previousTime = 0){
     previousTime = millis();
   };
-  for(int i = 0; i < TOTALENTRIES; i++){
-    regtime[i]+= (acquiredTime - previousTime);
-  };
+  //for(int i = 0; i < TOTALENTRIES; i++){
+    //regtime[i]+= (acquiredTime - previousTime);
+  //};
   tv.tv_sec = acquiredTime;
 }
 
@@ -477,8 +479,6 @@ void update_params(){
   Serial.printf("TVOC = %u %", pollution);
   Serial.println();
   //save_entry(temperature, humidity, pressure, pollution);
-
-
 
 }
 
@@ -727,18 +727,18 @@ const char settime_html[] PROGMEM = R"rawliteral(
         padding: 2vw;
         }
     </style>
-<h1>Current millis</h1>
-<h2 id="date"></h2><br>
-<button onclick="sendTime()">Sync</button>
+<h1>Device time</h1>
+<h2 id=\"date\"></h2><br>
+<button onclick="sdt()">Sync</button>
 <script>
-document.getElementById("date").innerHTML = new Date().getTime();
-function sendTime(){
-    var t = new Date().getTime();
+function updt(){document.getElementById(\"date\").innerHTML = Date.now()/1000>>0;}
+updt();
+sdt();
+setInterval(updt, 1000);
+function sdt(){
     var xhr = new XMLHttpRequest();
-    xhr.open("GET", "/sync?set_millis="+ t);
-    document.getElementById("date").innerHTML = t;
-    xhr.send();
-};
+    xhr.open(\"GET\", \"/time?settime=\"+ Date.now());
+    xhr.send();}
 </script>
 </html>
 )rawliteral";
@@ -761,10 +761,13 @@ public:
 
   server.on("/time", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send_P(200, "text/html", settime_html);
-    
-    Serial.println("timesync page loaded on client");
-    Serial.println();
-
+    Serial.println("time page from captivereqhandler");
+    if (request->hasParam("settime=")) {
+      acquiredTime = request->getParam("settime=")->value().toInt();
+      update_time();
+      Serial.printf("Time received: %lu \n", acquiredTime);
+      Serial.println();
+    }
   });
 
   server.on("/history", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -775,6 +778,7 @@ public:
 
   });
 
+/*
   server.on("/sync", HTTP_GET, [](AsyncWebServerRequest *request) {
     if (request->hasParam("set_millis=")) {
       acquiredTime = request->getParam("set_millis=")->value().toInt();
@@ -782,6 +786,7 @@ public:
       Serial.printf("Millis received: %lu \n", acquiredTime);
     }
   });
+*/
 
   }
   virtual ~CaptiveRequestHandler() {}
@@ -826,10 +831,11 @@ void setupServer() {
   
   server.on("/time", HTTP_GET, [](AsyncWebServerRequest *request) {
     //request->send_P(200, "text/html", settime_html);
-    if (request->hasParam("set_millis=")) {
-      acquiredTime = request->getParam("set_millis=")->value().toInt();
+    Serial.println("time page from setupserver");
+    if (request->hasParam("settime=")) {
+      acquiredTime = request->getParam("settime=")->value().toInt();
       update_time();
-      Serial.printf("Millis received: %lu \n", acquiredTime);
+      Serial.printf("Time received: %lu \n", acquiredTime);
     }
     //request->send_P(200, "text/html", settime_html);
   });

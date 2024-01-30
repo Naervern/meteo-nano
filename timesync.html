@@ -8,18 +8,18 @@
         padding: 2vw;
         }
     </style>
-<h1>Current millis</h1>
+<h1>Device time</h1>
 <h2 id="date"></h2><br>
-<button onclick="sendTime()">Sync</button>
+<button onclick="sdt()">Sync</button>
 <script>
-document.onload = () => {sendTime()};
-document.getElementById("date").innerHTML = new Date().getTime();
-function sendTime(){
-    var t = new Date().getTime();
+function updt(){document.getElementById("date").innerHTML = Date.now()/1000>>0;}
+updt();
+sdt();
+setInterval(updt, 1000);
+function sdt(){
     var xhr = new XMLHttpRequest();
-    xhr.open("GET", "/timesync?set_millis="+ t);
-    document.getElementById("date").innerHTML = t;
-    xhr.send();
-};
+    xhr.open("GET", "/time?settime="+ Date.now()/1000>>0);
+    xhr.send();}
+    
 </script>
 </html>
