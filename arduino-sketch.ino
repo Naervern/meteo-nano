@@ -698,7 +698,7 @@ const wd = %WDAY%;
 const wk = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const prs = [%PARMS%];
 
-let hCont = "<div style=\"display: grid; grid-template-columns: 50%% 50%%; align-items: center;\"><div><h2>History</h2></div><div><a href=\"/history.html\">Download all data</a></div></div>";
+let hCont = "<div style=\"display: grid; grid-template-columns: 50%% 50%%; align-items: center;\"><div><h2>History</h2></div><div><a href=\"/history\">Download all data</a></div></div>";
 for (let i = 0; i < 7; i++) {
  let j = 0;
  if(wd-i < 0){j = 7;};
@@ -735,7 +735,7 @@ document.getElementById("date").innerHTML = new Date().getTime();
 function sendTime(){
     var t = new Date().getTime();
     var xhr = new XMLHttpRequest();
-    xhr.open("GET", "/timesync?set_millis="+ t);
+    xhr.open("GET", "/sync?set_millis="+ t);
     document.getElementById("date").innerHTML = t;
     xhr.send();
 };
@@ -761,13 +761,21 @@ public:
 
   server.on("/time", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send_P(200, "text/html", settime_html);
+    
+    Serial.println("timesync page loaded on client");
+    Serial.println();
+
   });
 
   server.on("/history", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send_P(200, "text/html", "<html>History goes here</html>");
+
+    Serial.println("history page loaded on client");
+    Serial.println();
+
   });
 
-  server.on("/timesync", HTTP_GET, [](AsyncWebServerRequest *request) {
+  server.on("/sync", HTTP_GET, [](AsyncWebServerRequest *request) {
     if (request->hasParam("set_millis=")) {
       acquiredTime = request->getParam("set_millis=")->value().toInt();
       update_time();
@@ -802,6 +810,7 @@ inline void disableWiFi(){
 }
 
 
+/*
 inline void mode_normal() __attribute__((always_inline));
 void mode_normal(){
   ens160.setOperatingMode(0x00);
@@ -810,17 +819,19 @@ void mode_normal(){
   dnsServer.processNextRequest();
   //events.send(String(pressure).c_str(),"pressure",millis());
 }
+*/
+
 
 void setupServer() {
   
   server.on("/time", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send_P(200, "text/html", settime_html);
+    //request->send_P(200, "text/html", settime_html);
     if (request->hasParam("set_millis=")) {
       acquiredTime = request->getParam("set_millis=")->value().toInt();
       update_time();
       Serial.printf("Millis received: %lu \n", acquiredTime);
     }
-    request->send_P(200, "text/html", settime_html);
+    //request->send_P(200, "text/html", settime_html);
   });
 
   server.on("/history", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -830,12 +841,14 @@ void setupServer() {
   server.onNotFound([](AsyncWebServerRequest *request){request->send_P(200, "text/html", index_html, processor);});
 
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
+  /*
   request->send_P(200, "text/html", index_html, processor);
       if (request->hasParam("set_millis=")) {
       acquiredTime = request->getParam("set_millis=")->value().toInt();
       update_time();
       Serial.printf("Millis received: %lu \n", acquiredTime);
       }
+      */
   });
 }
 
@@ -844,7 +857,10 @@ void setup() {
   EEPROM.begin(EEPROM_SIZE);
   Serial.begin(115200);
   Wire.begin();
-  while (!Serial) {}; // wait for serial port to connect. Needed for native USB port only, easier debugging :P
+
+  //while (!Serial) {}; // wait for serial port to connect. Needed for native USB port only, easier debugging :P
+  delay(2000);
+
   regtemp = (float *) ps_malloc (TOTALENTRIES * sizeof (float));
   reghum = (float *) ps_malloc (TOTALENTRIES * sizeof (float));
   regpres = (float *) ps_malloc (TOTALENTRIES * sizeof (float));
@@ -898,7 +914,6 @@ void setup() {
   setupServer();
 
   server.begin();
-  //timeserver.begin();
   //historyserver.begin();
 }
 

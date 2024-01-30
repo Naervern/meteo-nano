@@ -12,6 +12,7 @@
 <h2 id="date"></h2><br>
 <button onclick="sendTime()">Sync</button>
 <script>
+document.onload = () => {sendTime()};
 document.getElementById("date").innerHTML = new Date().getTime();
 function sendTime(){
     var t = new Date().getTime();
