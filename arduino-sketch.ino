@@ -346,12 +346,12 @@ void store_measurement(uint16_t step){
   byte byteARR[18] = {0xFF};
 
   for (uint8_t i=0; i<DAILYENTRIES; i++){             //reserving the first 128 bytes of EEPROM for reasons
-    //18*( step - DAILYENTRIES + i + 1 ) + 128 -> for the start. This is called for the first time when the value of variable step is 144.
-    EEPROM.put(18*(step+i-DAILYENTRIES)+146, d_time[i]);   //first variable, 4 bytes (unsigned long) - UNIX time
-    EEPROM.put(18*(step+i-DAILYENTRIES)+150, d_temp[i]);   //second variable, 4 bytes (float) - temperature in degC
-    EEPROM.put(18*(step+i-DAILYENTRIES)+154, d_hum[i]);    //second variable, 4 bytes (float) - humidity in %
-    EEPROM.put(18*(step+i-DAILYENTRIES)+158, d_pres[i]);   //second variable, 4 bytes (float) - pressure in hPa
-    EEPROM.put(18*(step+i-DAILYENTRIES)+160, d_pol[i]);    //second variable, 4 bytes (uint16_t) - TVOC in ppb
+    //18*( step - DAILYENTRIES + i + 1 ) + EEPROMMARGIN -> for the start. This is called for the first time when the value of variable step is 144.
+    EEPROM.put(18*(step+i-DAILYENTRIES+1)+EEPROMMARGIN, d_time[i]);   //first variable, 4 bytes (unsigned long) - UNIX time
+    EEPROM.put(18*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+4, d_temp[i]);   //second variable, 4 bytes (float) - temperature in degC
+    EEPROM.put(18*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+8, d_hum[i]);    //second variable, 4 bytes (float) - humidity in %
+    EEPROM.put(18*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+12, d_pres[i]);   //second variable, 4 bytes (float) - pressure in hPa
+    EEPROM.put(18*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+16, d_pol[i]);    //second variable, 2 bytes (uint16_t) - TVOC in ppb
   };
 }
 
@@ -364,11 +364,11 @@ class readEntry {
     uint16_t pol;
   
   void get_measurement (uint16_t pas){
-    EEPROM.get(18*pas+128, tim); //reserving the first 128 bytes of EEPROM for reasons
-    EEPROM.get(18*pas+132, temp);
-    EEPROM.get(18*pas+136, hum);
-    EEPROM.get(18*pas+140, pres);
-    EEPROM.get(18*pas+142, pol);
+    EEPROM.get(18*pas+EEPROMMARGIN, tim); //reserving the first 128 bytes of EEPROM for reasons
+    EEPROM.get(18*pas+EEPROMMARGIN+4, temp);
+    EEPROM.get(18*pas+EEPROMMARGIN+8, hum);
+    EEPROM.get(18*pas+EEPROMMARGIN+12, pres);
+    EEPROM.get(18*pas+EEPROMMARGIN+16, pol);
   }
 };
 
@@ -378,7 +378,7 @@ RTC_FAST_ATTR uint32_t counter = 0, value = 0;
 void get_stored_data_length(){
   counter = 0, value = 0;
     while(true) {
-        EEPROM.get(18*counter+128, value);
+        EEPROM.get(18*counter + EEPROMMARGIN, value);
         Serial.printf("Checked the block");
         Serial.println(counter);
         if (value != 0xffffffff) {break;}
@@ -388,13 +388,7 @@ void get_stored_data_length(){
 }
 
 /*
-void get_measurement (uint16_t pas){
-    EEPROM.get(pas+128, unsigned long d_time[i]); //reserving the first 128 bytes of EEPROM for reasons
-    EEPROM.get(pas+132, float d_temp[i]);
-    EEPROM.get(pas+136, float d_hum[i]);
-    EEPROM.get(pas+140, float d_pres[i]);
-    EEPROM.get(pas+142, uint16_t d_pol[i]);
-}
+void get_measurement (uint16_t pas){}
 */
 
 /*
