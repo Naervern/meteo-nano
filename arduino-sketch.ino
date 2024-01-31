@@ -712,28 +712,25 @@ document.getElementById("hi_S").innerHTML = hCont;
 
 const char settime_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE HTML>
-<html>
-    <style>
-        html{text-align: center;}
-        button {
-        font-size: 2rem;
-        border-radius: 1vw;
-        padding: 2vw;
-        }
-    </style>
+<html><style>
+    html{text-align: center;}
+    button {font-size: 2rem;border-radius: 1vw;padding: 2vw;}
+</style>
 <h1>Device time</h1>
 <h2 id="date"></h2><br>
 <button onclick="sdt()">Sync</button>
 <script>
-function updt(){document.getElementById("date").innerHTML = Date.now()/1000>>0;}
+function updt(){document.getElementById("date").innerHTML=Date.now()/1000>>0;}
 updt();
 sdt();
-setInterval(updt, 1000);
+setInterval(updt,1000);
 function sdt(){
     var xhr = new XMLHttpRequest();
-    xhr.open("GET", "/time?settime="+ Date.now()/1000>>0);
+    let tn = Date.now()/1000>>0;
+    xhr.open("GET","/time?settime="+tn);
     xhr.send();}
-</script></html>
+</script>
+</html>
 
 )rawliteral";
 
