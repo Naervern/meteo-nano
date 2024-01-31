@@ -166,7 +166,6 @@ class BME280_I2C{
     }
     
     void readData(){
-        //Serial.println("readData() function called");
         int i = 0;
         uint32_t data[8];
         Wire.beginTransmission(ADDRESS);
@@ -728,19 +727,19 @@ const char settime_html[] PROGMEM = R"rawliteral(
         }
     </style>
 <h1>Device time</h1>
-<h2 id=\"date\"></h2><br>
+<h2 id="date"></h2><br>
 <button onclick="sdt()">Sync</button>
 <script>
-function updt(){document.getElementById(\"date\").innerHTML = Date.now()/1000>>0;}
+function updt(){document.getElementById("date").innerHTML = Date.now()/1000>>0;}
 updt();
 sdt();
 setInterval(updt, 1000);
 function sdt(){
     var xhr = new XMLHttpRequest();
-    xhr.open(\"GET\", \"/time?settime=\"+ Date.now());
+    xhr.open("GET", "/time?settime="+ Date.now()/1000>>0);
     xhr.send();}
-</script>
-</html>
+</script></html>
+
 )rawliteral";
 
 /*
@@ -837,7 +836,6 @@ void setupServer() {
       update_time();
       Serial.printf("Time received: %lu \n", acquiredTime);
     }
-    //request->send_P(200, "text/html", settime_html);
   });
 
   server.on("/history", HTTP_GET, [](AsyncWebServerRequest *request) {
