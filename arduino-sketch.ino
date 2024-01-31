@@ -755,9 +755,8 @@ public:
 
   server.on("/time", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send_P(200, "text/html", settime_html);
-    Serial.println("time page from captivereqhandler");
-    if (request->hasParam("settime=")) {
-      acquiredTime = request->getParam("settime=")->value().toInt();
+    if (request->hasParam("settime")) {
+      acquiredTime = request->getParam("settime")->value().toInt();
       update_time();
       Serial.printf("Time received: %lu \n", acquiredTime);
       Serial.println();
@@ -769,18 +768,7 @@ public:
 
     Serial.println("history page loaded on client");
     Serial.println();
-
   });
-
-/*
-  server.on("/sync", HTTP_GET, [](AsyncWebServerRequest *request) {
-    if (request->hasParam("set_millis=")) {
-      acquiredTime = request->getParam("set_millis=")->value().toInt();
-      update_time();
-      Serial.printf("Millis received: %lu \n", acquiredTime);
-    }
-  });
-*/
 
   }
   virtual ~CaptiveRequestHandler() {}
@@ -793,8 +781,8 @@ public:
 
   void handleRequest(AsyncWebServerRequest *request) {
     request->send_P(200, "text/html", index_html, processor);
-    if (request->hasParam("set_millis=")) {
-      acquiredTime = request->getParam("set_millis=")->value().toInt();
+    if (request->hasParam("settime")) {
+      acquiredTime = request->getParam("settime")->value().toInt();
       update_time();
       Serial.printf("Millis received: %lu \n", acquiredTime);
     };
@@ -824,10 +812,9 @@ void mode_normal(){
 void setupServer() {
   
   server.on("/time", HTTP_GET, [](AsyncWebServerRequest *request) {
-    //request->send_P(200, "text/html", settime_html);
-    Serial.println("time page from setupserver");
-    if (request->hasParam("settime=")) {
-      acquiredTime = request->getParam("settime=")->value().toInt();
+    request->send_P(200, "text/html", settime_html);
+    if (request->hasParam("settime")) {
+      acquiredTime = request->getParam("settime")->value().toInt();
       update_time();
       Serial.printf("Time received: %lu \n", acquiredTime);
     }
@@ -840,14 +827,7 @@ void setupServer() {
   server.onNotFound([](AsyncWebServerRequest *request){request->send_P(200, "text/html", index_html, processor);});
 
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-  /*
   request->send_P(200, "text/html", index_html, processor);
-      if (request->hasParam("set_millis=")) {
-      acquiredTime = request->getParam("set_millis=")->value().toInt();
-      update_time();
-      Serial.printf("Millis received: %lu \n", acquiredTime);
-      }
-      */
   });
 }
 
