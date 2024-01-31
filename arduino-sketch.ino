@@ -13,6 +13,7 @@
 #define TIMERDELAY 30    // Delay between measurements in seconds
 #define TOTALENTRIES 57600  // Total entries to be stored in the EEPROM
 #define DAILYENTRIES 144    // How many measurements expected to be done during a day. If every 24h/10min = 144
+#define EEPROMMARGIN 128    // Bytes reserved in the beginning of the EEPROM, before the storage space of the measurements
 
 #define AHT21_ADDRESS 0x38
 #define ENS160_ADDRESS 0x53
