@@ -19,6 +19,8 @@
 #define ENS160_ADDRESS 0x53
 #define BMP280_ADDRESS 0x76
 
+#define TIMEZONE "EET-2EEST,M3.5.0/3,M10.5.0/4"
+
 DNSServer dnsServer;
 AsyncWebServer server(80);
 //AsyncWebServer timeserver(80);
@@ -31,9 +33,35 @@ const unsigned long timerDelay = 30000;
 RTC_SLOW_ATTR float * regtemp;
 RTC_SLOW_ATTR float * reghum;
 RTC_SLOW_ATTR float * regpres;
-RTC_SLOW_ATTR uint16_t * regpol;
-RTC_SLOW_ATTR unsigned long * regtime;
-//ps_malloc();
+RTC_SLOW_ATTR uint16_t * regtvoc;
+RTC_SLOW_ATTR uint16_t * regco2;
+RTC_SLOW_ATTR time_t * regtime;
+
+RTC_SLOW_ATTR time_t now;
+
+RTC_SLOW_ATTR struct timeval tv;
+RTC_SLOW_ATTR unsigned long acquiredTime = 0;
+RTC_SLOW_ATTR unsigned long previousTime = 0;
+
+RTC_SLOW_ATTR short day_step = 0; // iterates over the day. Shouldn't be so important, but it's here just in case
+RTC_SLOW_ATTR uint8_t week_it = 0;    // this might be useless to track... but can also speed up the server access
+
+  //placeholder values that will be replaced by any realistic measurement
+RTC_FAST_ATTR float histtemperaturemax[7] = {-404.0, -404.0, -404.0, -404.0, -404.0, -404.0, -404.0};
+RTC_FAST_ATTR float histtemperaturemin[7] = {404.0, 404.0, 404.0, 404.0, 404.0, 404.0, 404.0};
+RTC_FAST_ATTR float histhumiditymax[7] = {-404.0, -404.0, -404.0, -404.0, -404.0, -404.0, -404.0};
+RTC_FAST_ATTR float histhumiditymin[7] = {404.0, 404.0, 404.0, 404.0, 404.0, 404.0, 404.0};
+RTC_FAST_ATTR float histpressure[7] = {4040.2, 4040.2, 4040.2, 4040.2, 4040.2, 4040.2, 4040.2};
+RTC_FAST_ATTR uint16_t histtvoc[7] = {0};
+
+  //these will all be used for the arrays
+RTC_SLOW_ATTR float * d_temp;
+RTC_SLOW_ATTR float * d_hum;
+RTC_SLOW_ATTR float * d_pres;
+RTC_SLOW_ATTR uint16_t * d_tvoc;
+RTC_SLOW_ATTR uint16_t * d_co2;
+RTC_SLOW_ATTR unsigned long * d_time;
+
 RTC_SLOW_ATTR uint32_t step = 0; //iterator for the regtab array. It keeps track of what's the next measurement to be stored.
 
 bool measurement_trigger = false;
@@ -47,7 +75,8 @@ SparkFun_ENS160 ens160;
 float temperature;
 float humidity;
 float pressure;
-uint16_t pollution;
+uint16_t tvoc;
+uint16_t co2;
 
 
 
@@ -280,36 +309,13 @@ int week_f(int i){
 
 // LOW POWER FUNCTIONS HERE
 
-RTC_SLOW_ATTR struct timeval tv;
-RTC_SLOW_ATTR unsigned long acquiredTime = 0;
-RTC_SLOW_ATTR unsigned long previousTime = 0;
-
-  //placeholder values that will be replaced by any realistic measurement
-RTC_FAST_ATTR float histtemperaturemax[7] = {-404.0, -404.0, -404.0, -404.0, -404.0, -404.0, -404.0};
-RTC_FAST_ATTR float histtemperaturemin[7] = {404.0, 404.0, 404.0, 404.0, 404.0, 404.0, 404.0};
-RTC_FAST_ATTR float histhumiditymax[7] = {-404.0, -404.0, -404.0, -404.0, -404.0, -404.0, -404.0};
-RTC_FAST_ATTR float histhumiditymin[7] = {404.0, 404.0, 404.0, 404.0, 404.0, 404.0, 404.0};
-RTC_FAST_ATTR float histpressure[7] = {4040.2, 4040.2, 4040.2, 4040.2, 4040.2, 4040.2, 4040.2};
-RTC_FAST_ATTR uint16_t histpollution[7] = {0};
-
-  //these will all be used for the arrays
-RTC_SLOW_ATTR float * d_temp;
-RTC_SLOW_ATTR float * d_hum;
-RTC_SLOW_ATTR float * d_pres;
-RTC_SLOW_ATTR uint16_t * d_pol;
-RTC_SLOW_ATTR unsigned long * d_time;
-RTC_SLOW_ATTR uint8_t d_10m_step = 0;
-
-RTC_SLOW_ATTR uint8_t week_it = 0; // iterates over the 7-long "hist" arrays over the week
-RTC_SLOW_ATTR uint8_t week_acq = 0; // learns the "day zero" for the iterator above
-
 /*
 RTC_FAST_ATTR float weektemp_h;
 RTC_FAST_ATTR float weektemp_l;
 RTC_FAST_ATTR float weekhum_h;
 RTC_FAST_ATTR float weekhum_l;
 RTC_FAST_ATTR float weekpres;
-RTC_FAST_ATTR uint32_t weekpol;
+RTC_FAST_ATTR uint32_t weektvoc;
 RTC_FAST_ATTR unsigned long weektime;
 */
 
@@ -317,22 +323,10 @@ inline void rtc_alloc(){
   d_temp = (float *) malloc (DAILYENTRIES * sizeof (float));
   d_hum = (float *) malloc (DAILYENTRIES * sizeof (float));
   d_pres = (float *) malloc (DAILYENTRIES * sizeof (float));
-  d_pol = (uint16_t *) malloc (DAILYENTRIES * sizeof (uint16_t));
-  d_time = (unsigned long *) malloc (DAILYENTRIES * sizeof (unsigned long));
-
+  d_tvoc = (uint16_t *) malloc (DAILYENTRIES * sizeof (uint16_t));
+  d_co2 = (uint16_t *) malloc (DAILYENTRIES * sizeof (uint16_t));
+  d_time = (time_t *) malloc (DAILYENTRIES * sizeof (long long int));
 }
-
-void store_week_data(float temp, float hum, float pres, uint16_t tvoc){
-  if (temp > histtemperaturemax[week_it]) histtemperaturemax[week_it] = temp;
-  if (temp < histtemperaturemin[week_it]) histtemperaturemin[week_it] = temp;
-  if (hum > histhumiditymax[week_it]) histhumiditymax[week_it] = hum;
-  if (hum < histhumiditymin[week_it]) histhumiditymin[week_it] = hum;
-  if (pres < histpressure[week_it]) histpressure[week_it] = pres;
-  if (tvoc > histpollution[week_it]) histpollution[week_it] = tvoc;  
-}
-
-
-
 
 // END OF NEW LOW POWER FUNCTIONS
 
@@ -351,7 +345,7 @@ void store_measurement(uint16_t step){
     EEPROM.put(18*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+4, d_temp[i]);   //second variable, 4 bytes (float) - temperature in degC
     EEPROM.put(18*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+8, d_hum[i]);    //second variable, 4 bytes (float) - humidity in %
     EEPROM.put(18*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+12, d_pres[i]);   //second variable, 4 bytes (float) - pressure in hPa
-    EEPROM.put(18*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+16, d_pol[i]);    //second variable, 2 bytes (uint16_t) - TVOC in ppb
+    EEPROM.put(18*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+16, d_tvoc[i]);    //second variable, 2 bytes (uint16_t) - TVOC in ppb
   };
 }
 
@@ -361,14 +355,14 @@ class readEntry {
     float temp;
     float hum;
     float pres;
-    uint16_t pol;
+    uint16_t tvoc;
   
-  void get_measurement (uint16_t pas){
+  void get_measurement (uint32_t pas){
     EEPROM.get(18*pas+EEPROMMARGIN, tim); //reserving the first 128 bytes of EEPROM for reasons
     EEPROM.get(18*pas+EEPROMMARGIN+4, temp);
     EEPROM.get(18*pas+EEPROMMARGIN+8, hum);
     EEPROM.get(18*pas+EEPROMMARGIN+12, pres);
-    EEPROM.get(18*pas+EEPROMMARGIN+16, pol);
+    EEPROM.get(18*pas+EEPROMMARGIN+16, tvoc);
   }
 };
 
@@ -406,17 +400,34 @@ client.write((const char*)data, 2048);
 */
 
 void update_time(){
+  localtime_r(&now, &timeinfo);
+  //uint8_t oldWday = weekday(&now);
+  settimeofday(acquiredTime, NULL);
   Serial.println("update time function called");
-  Serial.println(acquiredTime);
-  if(previousTime = 0){
-    previousTime = millis();
-  };
-  //for(int i = 0; i < TOTALENTRIES; i++){
-    //regtime[i]+= (acquiredTime - previousTime);
-  //};
-  tv.tv_sec = acquiredTime;
+  week_it = weekday(&now);
+  Serial.printf("weekday: %u ", week_it);
+	Serial.println();
+
+  //Serial.println(acquiredTime);
+  //uint8_t nWday = weekday(&now);
+  //  if(!getLocalTime(&timeinfo)) {Serial.println("Failed to obtain time"); weekday = 0;}
+  //  else{}
+  //previousTime = tv.tv_tsec;  
+  //tv.tv_sec = acquiredTime;
+  //if(nWday < oldWday) nWday += 7;
+  //organise_week(nWday-oldWday); //calls the function to 
+
 }
 
+/*
+void organise_week(int offset){
+float ow_tempmax, ow_tempmin, ow_hummax, ow_hummin, ow_pres;
+uint16_t ow_tvoc, ow_co2;
+
+
+
+}
+*/
 
 
 void save_entry(float val0, float val1, float val2, uint16_t val3){
@@ -426,7 +437,7 @@ void save_entry(float val0, float val1, float val2, uint16_t val3){
   regtemp[step] = val0;
   reghum[step] = val1;
   regpres[step] = val2;
-  regpol[step] = val3;
+  regtvoc[step] = val3;
   regtime[step] = millis();
   step++;
   if(step > TOTALENTRIES){step = 0;};
@@ -447,14 +458,8 @@ void update_params(){
 		Serial.print("Air Quality Index (1-5) : ");
 		Serial.println(ens160.getAQI());
 
-		Serial.print("Total Volatile Organic Compounds: ");
-		Serial.print(ens160.getTVOC());
-		Serial.println("ppb");
-
-		Serial.print("CO2 concentration: ");
-		Serial.print(ens160.getECO2());
-		Serial.println("ppm");
-    pollution = ens160.getTVOC();
+    co2 = ens160.getECO2();
+    tvoc = ens160.getTVOC();
     //ens160.setOperatingMode(0x00);
     
   //ENS160.setPWRMode(ENS160_SLEEP_MODE);
@@ -470,10 +475,48 @@ void update_params(){
     Serial.println();
   Serial.printf("Pressure = %.2f %", pressure);
     Serial.println();
-  Serial.printf("TVOC = %u %", pollution);
+  Serial.printf("Total Volatile Organic Compounds: = %u ppb", tvoc);
   Serial.println();
-  //save_entry(temperature, humidity, pressure, pollution);
+  	Serial.printf("CO2 concentration: %u ppm", co2);
+	Serial.println();
 
+  //save_entry(temperature, humidity, pressure, tvoc);
+
+  step++;     //increments the big counter
+  day_step++; //increments the daily counter
+  if (day_step >= DAILYENTRIES) {
+    shift_week(); day_step=0;
+    };
+  else store_week_data();
+}
+
+
+void store_week_data(){
+  if (temperature > histtemperaturemax[week_it]) histtemperaturemax[week_it] = temperature;
+  if (temperature < histtemperaturemin[week_it]) histtemperaturemin[week_it] = temperature;
+  if (humidity > histhumiditymax[week_it]) histhumiditymax[week_it] = humidity;
+  if (humidity < histhumiditymin[week_it]) histhumiditymin[week_it] = humidity;
+  if (pressure < histpressure[week_it]) histpressure[week_it] = pressure;
+  if (tvoc > histtvoc[week_it]) histtvoc[week_it] = tvoc;  
+}
+
+
+shift_week(){
+  float ow_tempmax, ow_tempmin, ow_hummax, ow_hummin, ow_pres;
+  uint16_t ow_tvoc, ow_co2;
+  for (uint8_t x = 0; x<5; x++)
+    {
+    histtemperaturemax[i+1]=histtemperaturemax[i];
+    histtemperaturemin[i+1]=histtemperaturemin[i];
+    histhumiditymax[i+1]=histhumiditymax[i];
+    histhumiditymin[i+1]=histhumiditymin[i];
+    histpressure[i+1]=histpressure[i];
+    histtvoc[i+1]=histtvoc[i];
+    };
+  histtemperaturemax[0], histtemperaturemin[0] = temperature;
+  histhumiditymax[0], histhumiditymin[0] = humidity;
+  histpressure[0] = pressure;
+  histtvoc[0] = tvoc;
 }
 
 
@@ -489,13 +532,13 @@ String processor(const String& var){
     return String(pressure);
   }
     else if(var == "POLU"){
-    return String(pollution);
+    return String(tvoc);
   }
     else if(var == "WDAY"){
     return String(week_it);
   }
 
-    else if(var == "PARMS"){ //parameters order = max temperature, min temperature, max humidity, min humidity, average pressure, max pollution.
+    else if(var == "PARMS"){ //parameters order = max temperature, min temperature, max humidity, min humidity, average pressure, max TVOC.
       String combined = "";
       //char* combined = "";
       //char[384] combined;
@@ -504,8 +547,8 @@ String processor(const String& var){
       for(float i: histhumiditymax){combined+= String(i, 1) + ",";};
       for(float i: histhumiditymin){combined+= String(i, 1) + ",";};
       for(float i: histpressure){combined+= String(i, 1) + ",";};
-      for(int i = 0; i<6; i++){combined+= String(histpollution[i]) + ",";};
-      combined+= String(histpollution[6]);
+      for(int i = 0; i<6; i++){combined+= String(histtvoc[i]) + ",";};
+      combined+= String(histtvoc[6]);
     return combined;
   }
  
@@ -656,37 +699,6 @@ const char index_html[] PROGMEM = R"rawliteral(
   </div>
 
 <script>
-if (!!window.EventSource) {
- var source = new EventSource('/events');
- 
- source.addEventListener('open', function(e) {
-  console.log("Events Connected");
- }, false);
- source.addEventListener('error', function(e) {
-  if (e.target.readyState != EventSource.OPEN) {
-    console.log("Events Disconnected");}
- }, false);
- 
- source.addEventListener('message', function(e) {
-  console.log("message", e.data);
- }, false);
- 
- source.addEventListener('temperature', function(e) {
-  document.getElementById("temf").innerHTML = e.data;
- }, false);
- 
- source.addEventListener('humidity', function(e) {
-  document.getElementById("humf").innerHTML = e.data;
- }, false);
-
-  source.addEventListener('pressure', function(e) {
-  document.getElementById("prsf").innerHTML = e.data;
- }, false);
-
-  source.addEventListener('pollution', function(e) {
-  document.getElementById("polf").innerHTML = e.data;
- }, false);
-};
 
 const wd = %WDAY%;
 const wk = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -778,11 +790,6 @@ public:
 
   void handleRequest(AsyncWebServerRequest *request) {
     request->send_P(200, "text/html", index_html, processor);
-    if (request->hasParam("settime")) {
-      acquiredTime = request->getParam("settime")->value().toInt();
-      update_time();
-      Serial.printf("Millis received: %lu \n", acquiredTime);
-    };
   };
 };
 
@@ -836,12 +843,14 @@ void setup() {
 
   //while (!Serial) {}; // wait for serial port to connect. Needed for native USB port only, easier debugging :P
   delay(2000);
-
+  /*
   regtemp = (float *) ps_malloc (TOTALENTRIES * sizeof (float));
   reghum = (float *) ps_malloc (TOTALENTRIES * sizeof (float));
   regpres = (float *) ps_malloc (TOTALENTRIES * sizeof (float));
-  regpol = (uint16_t *) ps_malloc (TOTALENTRIES * sizeof (unsigned int));
+  regtvoc = (uint16_t *) ps_malloc (TOTALENTRIES * sizeof (unsigned int));
   regtime = (unsigned long *) ps_malloc (TOTALENTRIES * sizeof (unsigned long));
+  */
+
   if(psramInit()){
     Serial.println("\nPSRAM is correctly initialized");
   }else{
@@ -904,7 +913,7 @@ void loop() {
     ens160.setOperatingMode(0x02);
     update_params();
     //ens160.setOperatingMode(0x02);
-    store_week_data(temperature, humidity, pressure, pollution);
+    //store_week_data();
     Serial.println("...");
     Serial.println();
 
