@@ -318,7 +318,7 @@ inline void rtc_alloc(){
   d_pres = (float *) malloc (DAILYENTRIES * sizeof (float));
   d_tvoc = (uint16_t *) malloc (DAILYENTRIES * sizeof (uint16_t));
   d_co2 = (uint16_t *) malloc (DAILYENTRIES * sizeof (uint16_t));
-  d_time = (time_t *) malloc (DAILYENTRIES * sizeof (time_t));
+  d_time = (time_t *) malloc (DAILYENTRIES * 8 /*sizeof (time_t)*/);
 }
 
 // END OF NEW LOW POWER FUNCTIONS
@@ -396,13 +396,13 @@ void update_time(){
   localtime_r(&now, timeinfo);
   //uint8_t oldWday = (&now/86400L + 4) % 7;
 
-  timeval tv;
+  //timeval tv;
       tv.tv_sec = (time_t)acquiredTime;  // epoch time (seconds)
       tv.tv_usec = 0;  
 
-  settimeofday(tv.tv_sec, NULL);
+  settimeofday(tv, NULL);
   Serial.println("update time function called");
-  week_it = (&now/86400LL + 4) % 7;
+  week_it = (now/86400LL + 4) % 7;
   Serial.printf("weekday: %u ", week_it);
 	Serial.println();
 
