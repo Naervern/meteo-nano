@@ -486,7 +486,7 @@ void update_params(){
   day_step++; //increments the daily counter
   if (day_step >= DAILYENTRIES) {
     shift_week(); day_step=0;
-    };
+    }
   else store_week_data();
 }
 
@@ -501,7 +501,7 @@ void store_week_data(){
 }
 
 
-shift_week(){
+void shift_week(){
   float ow_tempmax, ow_tempmin, ow_hummax, ow_hummin, ow_pres;
   uint16_t ow_tvoc, ow_co2;
   for (uint8_t x = 0; x<5; x++)
