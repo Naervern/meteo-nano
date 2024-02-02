@@ -37,8 +37,8 @@ RTC_SLOW_ATTR uint16_t * regtvoc;
 RTC_SLOW_ATTR uint16_t * regco2;
 RTC_SLOW_ATTR time_t * regtime;
 
-RTC_SLOW_ATTR time_t now;
-
+RTC_SLOW_ATTR time_t now = time(nullptr);
+RTC_SLOW_ATTR struct tm * timeinfo;
 RTC_SLOW_ATTR struct timeval tv;
 RTC_SLOW_ATTR unsigned long acquiredTime = 0;
 RTC_SLOW_ATTR unsigned long previousTime = 0;
@@ -77,6 +77,7 @@ float humidity;
 float pressure;
 uint16_t tvoc;
 uint16_t co2;
+
 
 
 
@@ -299,14 +300,6 @@ class BME280_I2C{
 
 BME280_I2C bmp280;
 
-/*
-int week_f(int i){
-  if (week_it + i <7){return week_it + i;}
-  else {return week_it+i-7;}
-}
-*/
-
-
 // LOW POWER FUNCTIONS HERE
 
 /*
@@ -325,7 +318,7 @@ inline void rtc_alloc(){
   d_pres = (float *) malloc (DAILYENTRIES * sizeof (float));
   d_tvoc = (uint16_t *) malloc (DAILYENTRIES * sizeof (uint16_t));
   d_co2 = (uint16_t *) malloc (DAILYENTRIES * sizeof (uint16_t));
-  d_time = (time_t *) malloc (DAILYENTRIES * sizeof (long long int));
+  d_time = (time_t *) malloc (DAILYENTRIES * sizeof (time_t));
 }
 
 // END OF NEW LOW POWER FUNCTIONS
@@ -400,11 +393,16 @@ client.write((const char*)data, 2048);
 */
 
 void update_time(){
-  localtime_r(&now, &timeinfo);
+  localtime_r(&now, timeinfo);
   //uint8_t oldWday = (&now/86400L + 4) % 7;
-  settimeofday(acquiredTime, NULL);
+
+  timeval tv;
+      tv.tv_sec = (time_t)acquiredTime;  // epoch time (seconds)
+      tv.tv_usec = 0;  
+
+  settimeofday(tv.tv_sec, NULL);
   Serial.println("update time function called");
-  week_it = (&now/86400L + 4) % 7;
+  week_it = (&now/86400LL + 4) % 7;
   Serial.printf("weekday: %u ", week_it);
 	Serial.println();
 
