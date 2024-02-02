@@ -401,15 +401,15 @@ client.write((const char*)data, 2048);
 
 void update_time(){
   localtime_r(&now, &timeinfo);
-  //uint8_t oldWday = weekday(&now);
+  //uint8_t oldWday = (&now/86400L + 4) % 7;
   settimeofday(acquiredTime, NULL);
   Serial.println("update time function called");
-  week_it = weekday(&now);
+  week_it = (&now/86400L + 4) % 7;
   Serial.printf("weekday: %u ", week_it);
 	Serial.println();
 
   //Serial.println(acquiredTime);
-  //uint8_t nWday = weekday(&now);
+  //uint8_t nWday = (&now/86400L + 4) % 7;
   //  if(!getLocalTime(&timeinfo)) {Serial.println("Failed to obtain time"); weekday = 0;}
   //  else{}
   //previousTime = tv.tv_tsec;  
