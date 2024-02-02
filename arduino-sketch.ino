@@ -504,7 +504,7 @@ void store_week_data(){
 void shift_week(){
   float ow_tempmax, ow_tempmin, ow_hummax, ow_hummin, ow_pres;
   uint16_t ow_tvoc, ow_co2;
-  for (uint8_t x = 0; x<5; x++)
+  for (uint8_t i = 0; i<5; x++)
     {
     histtemperaturemax[i+1]=histtemperaturemax[i];
     histtemperaturemin[i+1]=histtemperaturemin[i];
