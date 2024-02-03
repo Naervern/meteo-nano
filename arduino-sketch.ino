@@ -2,10 +2,8 @@
 #include <WiFi.h>
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
-//#include <time.h>
 #include <ESP32Time.h>
 #include "AsyncUDP.h"
-//#include <SPI.h>
 #include <AHT20.h>
 #include "SparkFun_ENS160.h"
 #include <Wire.h>
@@ -482,13 +480,17 @@ void update_params(){
   Serial.println();
   	Serial.printf("CO2 concentration: %u ppm", co2);
 	Serial.println();
+    Serial.print("Time: ");
+    Serial.println(rtc.getTime("RTC0: %A, %B %d %Y %H:%M:%S"));
 
   //save_entry(temperature, humidity, pressure, tvoc);
 
   step++;     //increments the big counter
+  Serial.println("variable step value = ");  Serial.println(step); //debug
   day_step++; //increments the daily counter
+  Serial.println("variable day_step value = ");  Serial.println(day_step); //debug
   if (day_step >= DAILYENTRIES) {
-    shift_week(); day_step=0;
+        shift_week(); day_step=0;
     }
   else store_week_data();
 }
@@ -505,16 +507,17 @@ void store_week_data(){
 
 
 void shift_week(){
+  Serial.println("shift_week function executed."); //debug
   float ow_tempmax, ow_tempmin, ow_hummax, ow_hummin, ow_pres;
   uint16_t ow_tvoc, ow_co2;
-  for (uint8_t i = 0; i<5; i++)
+  for (uint8_t i = 6; i>0; i--)
     {
-    histtemperaturemax[i+1]=histtemperaturemax[i];
-    histtemperaturemin[i+1]=histtemperaturemin[i];
-    histhumiditymax[i+1]=histhumiditymax[i];
-    histhumiditymin[i+1]=histhumiditymin[i];
-    histpressure[i+1]=histpressure[i];
-    histtvoc[i+1]=histtvoc[i];
+    histtemperaturemax[i]=histtemperaturemax[i-1];
+    histtemperaturemin[i]=histtemperaturemin[i-1];
+    histhumiditymax[i]=histhumiditymax[i-1];
+    histhumiditymin[i]=histhumiditymin[i-1];
+    histpressure[i]=histpressure[i-1];
+    histtvoc[i]=histtvoc[i-1];
     };
   histtemperaturemax[0], histtemperaturemin[0] = temperature;
   histhumiditymax[0], histhumiditymin[0] = humidity;
@@ -868,7 +871,7 @@ void setup() {
   setCpuFrequencyMhz(80);
 
   setenv("TZ", "EET-2EEST,M3.5.0/3,M10.5.0/4", 1); // Timezone set to Helsinki
-  tzset();
+  //tzset();
   bmp280.begin();
   if (aht20.begin() == false){Serial.println("AHT20 not detected. Please check wiring.");} else {Serial.println("AHT20 acknowledged.");}
   ens160.begin();
