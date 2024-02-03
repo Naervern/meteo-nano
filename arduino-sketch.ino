@@ -848,7 +848,7 @@ void setup() {
   Wire.begin();
 
   //while (!Serial) {}; // wait for serial port to connect. Needed for native USB port only, easier debugging :P
-  delay(2000);
+  //delay(2000); //debug stuff
   /*
   regtemp = (float *) ps_malloc (TOTALENTRIES * sizeof (float));
   reghum = (float *) ps_malloc (TOTALENTRIES * sizeof (float));
