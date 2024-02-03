@@ -2,7 +2,8 @@
 #include <WiFi.h>
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
-#include <time.h>
+//#include <time.h>
+#include <ESP32Time.h>
 #include "AsyncUDP.h"
 //#include <SPI.h>
 #include <AHT20.h>
@@ -65,11 +66,13 @@ RTC_SLOW_ATTR uint32_t step = 0; //iterator for the regtab array. It keeps track
 
 bool static measurement_trigger = false;
 bool static midnight_trigger = false;
-bool static wifi_on = false;
+bool static   wifi_on = false;
 
 AHT20 aht20;
 
 SparkFun_ENS160 ens160;
+
+ESP32Time rtc;
 
 float temperature;
 float humidity;
@@ -395,16 +398,16 @@ RTC_SLOW_ATTR time_t now = time(nullptr);
 
 void update_time(){
 
-  struct tm * timeinfo;
-  localtime_r(&now, timeinfo);
+  //struct tm * timeinfo;
+  //localtime_r(&now, timeinfo);
 
-  timeval tv;
-      tv.tv_sec = (time_t)acquiredTime;  // epoch time (seconds)
-      tv.tv_usec = 0;  
+ //timeval tv;
+ //     tv.tv_sec = (time_t)acquiredTime;  // epoch time (seconds)
+ //     tv.tv_usec = 0;  
 
-  settimeofday(&tv, NULL);
+  rtc.setTime(acquiredTime);
   Serial.println("update time function called");
-  week_it = (now/86400LL + 4) % 7;
+  week_it = rtc.getDayofWeek();
   Serial.printf("weekday: %u ", week_it);
 	Serial.println();
 
