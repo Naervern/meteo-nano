@@ -37,14 +37,13 @@ RTC_SLOW_ATTR uint16_t * regtvoc;
 RTC_SLOW_ATTR uint16_t * regco2;
 RTC_SLOW_ATTR time_t * regtime;
 
-RTC_SLOW_ATTR time_t now = time(nullptr);
-RTC_SLOW_ATTR struct tm * timeinfo;
-RTC_SLOW_ATTR struct timeval tv;
-RTC_SLOW_ATTR unsigned long acquiredTime = 0;
-RTC_SLOW_ATTR unsigned long previousTime = 0;
+//RTC_SLOW_ATTR struct tm * timeinfo;
+//RTC_SLOW_ATTR struct timeval tv;
+RTC_SLOW_ATTR static unsigned long acquiredTime = 0;
+RTC_SLOW_ATTR static unsigned long previousTime = 0;
 
-RTC_SLOW_ATTR short day_step = 0; // iterates over the day. Shouldn't be so important, but it's here just in case
-RTC_SLOW_ATTR uint8_t week_it = 0;    // this might be useless to track... but can also speed up the server access
+RTC_SLOW_ATTR static short day_step = 0; // iterates over the day. Shouldn't be so important, but it's here just in case
+RTC_SLOW_ATTR static uint8_t week_it = 0;    // this might be useless to track... but can also speed up the server access
 
   //placeholder values that will be replaced by any realistic measurement
 RTC_FAST_ATTR float histtemperaturemax[7] = {-404.0, -404.0, -404.0, -404.0, -404.0, -404.0, -404.0};
@@ -60,13 +59,13 @@ RTC_SLOW_ATTR float * d_hum;
 RTC_SLOW_ATTR float * d_pres;
 RTC_SLOW_ATTR uint16_t * d_tvoc;
 RTC_SLOW_ATTR uint16_t * d_co2;
-RTC_SLOW_ATTR unsigned long * d_time;
+RTC_SLOW_ATTR time_t * d_time;
 
 RTC_SLOW_ATTR uint32_t step = 0; //iterator for the regtab array. It keeps track of what's the next measurement to be stored.
 
-bool measurement_trigger = false;
-bool midnight_trigger = false;
-bool wifi_on = false;
+bool static measurement_trigger = false;
+bool static midnight_trigger = false;
+bool static wifi_on = false;
 
 AHT20 aht20;
 
@@ -318,7 +317,7 @@ inline void rtc_alloc(){
   d_pres = (float *) malloc (DAILYENTRIES * sizeof (float));
   d_tvoc = (uint16_t *) malloc (DAILYENTRIES * sizeof (uint16_t));
   d_co2 = (uint16_t *) malloc (DAILYENTRIES * sizeof (uint16_t));
-  d_time = (time_t *) malloc (DAILYENTRIES * 8 /*sizeof (time_t)*/);
+  d_time = (time_t *) malloc (DAILYENTRIES * sizeof (time_t));
 }
 
 // END OF NEW LOW POWER FUNCTIONS
@@ -392,15 +391,18 @@ client.write((const char*)data, 2048);
 }
 */
 
-void update_time(){
-  localtime_r(&now, timeinfo);
-  //uint8_t oldWday = (&now/86400L + 4) % 7;
+RTC_SLOW_ATTR time_t now = time(nullptr);
 
-  //timeval tv;
+void update_time(){
+
+  struct tm * timeinfo;
+  localtime_r(&now, timeinfo);
+
+  timeval tv;
       tv.tv_sec = (time_t)acquiredTime;  // epoch time (seconds)
       tv.tv_usec = 0;  
 
-  settimeofday(tv, NULL);
+  settimeofday(&tv, NULL);
   Serial.println("update time function called");
   week_it = (now/86400LL + 4) % 7;
   Serial.printf("weekday: %u ", week_it);
@@ -469,9 +471,9 @@ void update_params(){
   Serial.println("New measurement");
   Serial.printf("Temperature = %.2f °C", temperature);
     Serial.println();
-  Serial.printf("Humidity = %.2f %", humidity);
+  Serial.printf("Humidity = %.2f %%", humidity);
     Serial.println();
-  Serial.printf("Pressure = %.2f %", pressure);
+  Serial.printf("Pressure = %.2f hPa", pressure);
     Serial.println();
   Serial.printf("Total Volatile Organic Compounds: = %u ppb", tvoc);
   Serial.println();
@@ -873,6 +875,7 @@ void setup() {
   ens160.setOperatingMode(0x02);
 
   update_params();
+  step--; day_step--;
 
 
   WiFi.mode(WIFI_AP);
