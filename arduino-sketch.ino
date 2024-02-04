@@ -555,6 +555,18 @@ String processor(const String& var){
       for(float i: histpressure){combined+= String(i, 1) + ",";};
       for(int i = 0; i<6; i++){combined+= String(histtvoc[i]) + ",";};
       combined+= String(histtvoc[6]);
+
+      /*
+      for (uint8_t i = 0; i<7; i++){
+        combined += String(histtemperaturemax[i], 1) + ",";
+        combined += String(histtemperaturemin[i], 1) + ",";
+        combined += String(histhumiditymax[i], 1) + ",";
+        combined += String(histhumiditymin[i], 1) + ",";
+        combined += String(histpressure[i], 1) + ","
+        combined += String(histtvoc[i]) + ",";
+        combined.pop_back();
+      };
+      */
     return combined;
   }
  
@@ -712,13 +724,13 @@ const prs = [%PARMS%];
 
 let hCont = "<div style=\"display: grid; grid-template-columns: 50%% 50%%; align-items: center;\"><div><h2>History</h2></div><div><a href=\"/history\">Download all data</a></div></div>";
 for (let i = 0; i < 7; i++) {
- let j = 0;
- if(wd-i < 0){j = 7;};
- hCont += "<div class=\"boxed\">";
- if(i>0){hCont+="<div>"+wk[wd-i+j]+"</div>"};
- if(i===0){hCont+= "<div>Today<br>so far...</div>"};
- hCont += "<div><h2>&#127777;</h2></div><div class=\"half\"> &#9652;"+prs[wd-i+j]+"&deg;C<br>&#9662;"+prs[wd-i+j+7]+"&deg;C</div><div><h2>&#128167;</h2></div><div>&#9652;"+prs[wd-i+j+14]+"&#37;<br>&#9662;"+prs[wd-i+j+21]+"&#37; </div><div>"+prs[wd-i+j+28]+" hPa</div><div>"+prs[wd-i+j+35]+"ppb</div></div>";
-if (i<6){hCont+= "<hr>";};
+let j = 0;
+if(wd-i < 0) j = 7;
+hCont+="<div class=\"boxed\">";
+if(i>0)hCont+="<div>"+wk[wd-i+j]+"</div>";
+if(i===0)hCont+="<div>Today<br>so far...</div>";
+hCont+="<div><h2>&#127777;</h2></div><div class=\"half\"> &#9652;"+prs[i]+"&deg;C<br>&#9662;"+prs[i+7]+"&deg;C</div><div><h2>&#128167;</h2></div><div>&#9652;"+prs[i+14]+"&#37;<br>&#9662;"+prs[i+21]+"&#37; </div><div>"+prs[i+28]+" hPa</div><div>"+prs[i+35]+"ppb</div></div>";
+if (i<6){hCont+="<hr>";};
 }
 
 document.getElementById("hi_S").innerHTML = hCont;
