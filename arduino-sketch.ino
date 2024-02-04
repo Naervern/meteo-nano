@@ -497,12 +497,12 @@ void update_params(){
 
 
 void store_week_data(){
-  if (temperature > histtemperaturemax[week_it]) histtemperaturemax[week_it] = temperature;
-  if (temperature < histtemperaturemin[week_it]) histtemperaturemin[week_it] = temperature;
-  if (humidity > histhumiditymax[week_it]) histhumiditymax[week_it] = humidity;
-  if (humidity < histhumiditymin[week_it]) histhumiditymin[week_it] = humidity;
-  if (pressure < histpressure[week_it]) histpressure[week_it] = pressure;
-  if (tvoc > histtvoc[week_it]) histtvoc[week_it] = tvoc;  
+  if (temperature > histtemperaturemax[0]) histtemperaturemax[0] = temperature;
+  if (temperature < histtemperaturemin[0]) histtemperaturemin[0] = temperature;
+  if (humidity > histhumiditymax[0]) histhumiditymax[0] = humidity;
+  if (humidity < histhumiditymin[0]) histhumiditymin[0] = humidity;
+  if (pressure < histpressure[0]) histpressure[0] = pressure;
+  if (tvoc > histtvoc[0]) histtvoc[0] = tvoc;
 }
 
 
