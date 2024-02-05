@@ -502,7 +502,7 @@ void store_week_data(){
   if (humidity > histhumiditymax[0]) histhumiditymax[0] = humidity;
   if (humidity < histhumiditymin[0]) histhumiditymin[0] = humidity;
   if (pressure < histpressure[0]) histpressure[0] = pressure;
-  if (tvoc > histtvoc[0]) histtvoc[0] = tvoc;
+  if (tvoc > histtvoc[0]) histtvoc[0] = tvoc;  
 }
 
 
@@ -510,7 +510,7 @@ void shift_week(){
   Serial.println("shift_week function executed."); //debug
   float ow_tempmax, ow_tempmin, ow_hummax, ow_hummin, ow_pres;
   uint16_t ow_tvoc, ow_co2;
-  for (uint8_t i = 6; i>0; i--)
+  for (int8_t i = 6; i>0; i--)
     {
     histtemperaturemax[i]=histtemperaturemax[i-1];
     histtemperaturemin[i]=histtemperaturemin[i-1];
