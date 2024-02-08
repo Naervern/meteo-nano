@@ -892,8 +892,7 @@ void setup() {
   ens160.setOperatingMode(SFE_ENS160_STANDARD);
   ens160.setOperatingMode(0x02);
 
-  update_params();
-  step--; day_step--;
+  update_params(); step--; day_step--;
 
 
   WiFi.mode(WIFI_AP);
