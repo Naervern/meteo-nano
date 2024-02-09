@@ -11,6 +11,7 @@ Current dependencies:
 - Wire.h
 - AHT20.h
 - SparkFun_ENS160.h
+- EEPROM.h
 
 Features:
 - Solar charging, supercapacitor operation
