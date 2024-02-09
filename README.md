@@ -7,7 +7,7 @@ Current dependencies:
 - DNSServer.h
 - WiFi.h
 - AsyncTCP.h
-- Time.h
+- ESP32Time.h
 - Wire.h
 - AHT20.h
 - SparkFun_ENS160.h
