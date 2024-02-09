@@ -17,7 +17,8 @@ Features:
 - Power saving operation under low light environment
 - Temperature, relative humidity, atmospheric pressure and TVOC sensors
 - One measurement every 10 minutes
-- Database of up to 54000 entries stored
+- Database of entries stored can be configured so long as it does not exceed the EEPROM size
 - Registry of 6 parameters (max, min temperature; max, min humidity; minimum pressure; peak TVOC) for the current and the 6 prior days
+- Optionally, eCO2 can be logged as well, but since this parameter has a very low localised deviation, it was opted to leave out for this project.
 
 The module clock can be adjusted by accessing the /time address then clicking the "Sync" button, sending the client device milliseconds since epoch by HTTP.
