@@ -12,7 +12,6 @@ Current dependencies:
 - SPI.h
 - AHT20.h
 - SparkFun_ENS160.h
-- Adafruit_BMP280.h
 
 Features:
 - Solar charging, supercapacitor operation
