@@ -9,7 +9,6 @@ Current dependencies:
 - AsyncTCP.h
 - Time.h
 - Wire.h
-- SPI.h
 - AHT20.h
 - SparkFun_ENS160.h
 
