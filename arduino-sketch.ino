@@ -8,11 +8,13 @@
 #include "SparkFun_ENS160.h"
 #include <Wire.h>
 #include <EEPROM.h>
+//#include "html.h"
 
-#define TIMERDELAY 30    // Delay between measurements in seconds
+#define TIMERDELAY 30       // Delay between measurements in seconds
 #define TOTALENTRIES 57600  // Total entries to be stored in the EEPROM
 #define DAILYENTRIES 144    // How many measurements expected to be done during a day. If every 24h/10min = 144
 #define EEPROMMARGIN 128    // Bytes reserved in the beginning of the EEPROM, before the storage space of the measurements
+#define DATASIZE 16         // The sum of all enabled stored data types. 8 bytes time_t, plus 3 * int16_t and one uint_16 = 16 bytes
 
 #define AHT21_ADDRESS 0x38
 #define ENS160_ADDRESS 0x53
@@ -29,36 +31,39 @@ AsyncEventSource events("/events");
 RTC_SLOW_ATTR unsigned long lastTime = 0;   
 const unsigned long timerDelay = 30000;
 
-RTC_SLOW_ATTR float * regtemp;
-RTC_SLOW_ATTR float * reghum;
-RTC_SLOW_ATTR float * regpres;
-RTC_SLOW_ATTR uint16_t * regtvoc;
-RTC_SLOW_ATTR uint16_t * regco2;
-RTC_SLOW_ATTR time_t * regtime;
+
+/*
+RTC_SLOW_ATTR static float * regtemp;
+RTC_SLOW_ATTR static float * reghum;
+RTC_SLOW_ATTR static float * regpres;
+RTC_SLOW_ATTR static uint16_t * regtvoc;
+RTC_SLOW_ATTR static uint16_t * regco2;
+RTC_SLOW_ATTR static time_t * regtime;
+*/
 
 //RTC_SLOW_ATTR struct tm * timeinfo;
 //RTC_SLOW_ATTR struct timeval tv;
 RTC_SLOW_ATTR static unsigned long acquiredTime = 0;
 RTC_SLOW_ATTR static unsigned long previousTime = 0;
 
-RTC_SLOW_ATTR static short day_step = 0; // iterates over the day. Shouldn't be so important, but it's here just in case
+RTC_SLOW_ATTR static auto day_step = 0; // iterates over the day. Shouldn't be actually important to keep track of, but it's here just in case
 RTC_SLOW_ATTR static uint8_t week_it = 0;    // this might be useless to track... but can also speed up the server access
 
   //placeholder values that will be replaced by any realistic measurement
-RTC_FAST_ATTR float histtemperaturemax[7] = {-404.0, -404.0, -404.0, -404.0, -404.0, -404.0, -404.0};
-RTC_FAST_ATTR float histtemperaturemin[7] = {404.0, 404.0, 404.0, 404.0, 404.0, 404.0, 404.0};
-RTC_FAST_ATTR float histhumiditymax[7] = {-404.0, -404.0, -404.0, -404.0, -404.0, -404.0, -404.0};
-RTC_FAST_ATTR float histhumiditymin[7] = {404.0, 404.0, 404.0, 404.0, 404.0, 404.0, 404.0};
-RTC_FAST_ATTR float histpressure[7] = {4040.2, 4040.2, 4040.2, 4040.2, 4040.2, 4040.2, 4040.2};
-RTC_FAST_ATTR uint16_t histtvoc[7] = {0};
+RTC_FAST_ATTR float weektemp_H[7] = {-404.0, -404.0, -404.0, -404.0, -404.0, -404.0, -404.0};
+RTC_FAST_ATTR float weektemp_L[7] = {404.0, 404.0, 404.0, 404.0, 404.0, 404.0, 404.0};
+RTC_FAST_ATTR float weekhum_H[7] = {-404.0, -404.0, -404.0, -404.0, -404.0, -404.0, -404.0};
+RTC_FAST_ATTR float weekhum_L[7] = {404.0, 404.0, 404.0, 404.0, 404.0, 404.0, 404.0};
+RTC_FAST_ATTR float weekpres_L[7] = {4040.2, 4040.2, 4040.2, 4040.2, 4040.2, 4040.2, 4040.2};
+RTC_FAST_ATTR uint16_t weektvoc_H[7] = {0};
 
   //these will all be used for the arrays
-RTC_SLOW_ATTR float * d_temp;
-RTC_SLOW_ATTR float * d_hum;
-RTC_SLOW_ATTR float * d_pres;
-RTC_SLOW_ATTR uint16_t * d_tvoc;
-RTC_SLOW_ATTR uint16_t * d_co2;
-RTC_SLOW_ATTR time_t * d_time;
+RTC_SLOW_ATTR static int16_t * d_temp;
+RTC_SLOW_ATTR static int16_t * d_hum;
+RTC_SLOW_ATTR static int16_t * d_pres;
+RTC_SLOW_ATTR static uint16_t * d_tvoc;
+RTC_SLOW_ATTR static uint16_t * d_co2;
+RTC_SLOW_ATTR static time_t * d_time;
 
 RTC_SLOW_ATTR uint32_t step = 0; //iterator for the regtab array. It keeps track of what's the next measurement to be stored.
 
@@ -303,7 +308,7 @@ BME280_I2C bmp280;
 // LOW POWER FUNCTIONS HERE
 
 /*
-RTC_FAST_ATTR float weektemp_h;
+RTC_FAST_ATTR float weektemp_H;
 RTC_FAST_ATTR float weektemp_l;
 RTC_FAST_ATTR float weekhum_h;
 RTC_FAST_ATTR float weekhum_l;
@@ -313,9 +318,9 @@ RTC_FAST_ATTR unsigned long weektime;
 */
 
 inline void rtc_alloc(){
-  d_temp = (float *) malloc (DAILYENTRIES * sizeof (float));
-  d_hum = (float *) malloc (DAILYENTRIES * sizeof (float));
-  d_pres = (float *) malloc (DAILYENTRIES * sizeof (float));
+  d_temp = (int16_t *) malloc (DAILYENTRIES * sizeof (int16_t));
+  d_hum = (int16_t *) malloc (DAILYENTRIES * sizeof (int16_t));
+  d_pres = (int16_t *) malloc (DAILYENTRIES * sizeof (int16_t));
   d_tvoc = (uint16_t *) malloc (DAILYENTRIES * sizeof (uint16_t));
   d_co2 = (uint16_t *) malloc (DAILYENTRIES * sizeof (uint16_t));
   d_time = (time_t *) malloc (DAILYENTRIES * sizeof (time_t));
@@ -330,32 +335,38 @@ inline void rtc_alloc(){
 #define EEPROM_SIZE 3145728 //size of the flash memory to be reserved. 3145728 = 3MB
 
 void store_measurement(uint16_t step){
-  byte byteARR[18] = {0xFF};
+  byte byteARR[DATASIZE] = {0xFF};
 
   for (uint8_t i=0; i<DAILYENTRIES; i++){             //reserving the first 128 bytes of EEPROM for reasons
-    //18*( step - DAILYENTRIES + i + 1 ) + EEPROMMARGIN -> for the start. This is called for the first time when the value of variable step is 144.
-    EEPROM.put(18*(step+i-DAILYENTRIES+1)+EEPROMMARGIN, d_time[i]);   //first variable, 4 bytes (unsigned long) - UNIX time
-    EEPROM.put(18*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+4, d_temp[i]);   //second variable, 4 bytes (float) - temperature in degC
-    EEPROM.put(18*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+8, d_hum[i]);    //second variable, 4 bytes (float) - humidity in %
-    EEPROM.put(18*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+12, d_pres[i]);   //second variable, 4 bytes (float) - pressure in hPa
-    EEPROM.put(18*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+16, d_tvoc[i]);    //second variable, 2 bytes (uint16_t) - TVOC in ppb
+    //DATASIZE*( step - DAILYENTRIES + i + 1 ) + EEPROMMARGIN -> for the start. This is called for the first time when the value of variable step is DAILYENTRIES.
+    EEPROM.put(DATASIZE*(step+i-DAILYENTRIES+1)+EEPROMMARGIN, d_time[i]);   //first variable, 8 bytes (time_t) - UNIX time
+    EEPROM.put(DATASIZE*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+8, d_temp[i]);   //second variable, 2 bytes (int16_t) - temperature in degC with 0.01 degree
+    EEPROM.put(DATASIZE*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+10, d_hum[i]);    //second variable, 2 bytes (int16_t) - humidity in %
+    EEPROM.put(DATASIZE*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+12, d_pres[i]);   //second variable, 2 bytes (int16_t) - pressure in hPa
+    EEPROM.put(DATASIZE*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+14, d_tvoc[i]);    //second variable, 2 bytes (uint16_t) - TVOC in ppb
+    //EEPROM.put(DATASIZE*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+16, d_co2[i]);    //second variable, 2 bytes (uint16_t) - eCO2 in ppm --- disabled in this example
   };
 }
 
 class readEntry {
   public:
-    unsigned long tim;
+    time_t tim;
     float temp;
     float hum;
     float pres;
     uint16_t tvoc;
+    //uint16_t co2;
+    int16_t t;
+    int16_t h;
+    int16_t p;
   
   void get_measurement (uint32_t pas){
-    EEPROM.get(18*pas+EEPROMMARGIN, tim); //reserving the first 128 bytes of EEPROM for reasons
-    EEPROM.get(18*pas+EEPROMMARGIN+4, temp);
-    EEPROM.get(18*pas+EEPROMMARGIN+8, hum);
-    EEPROM.get(18*pas+EEPROMMARGIN+12, pres);
-    EEPROM.get(18*pas+EEPROMMARGIN+16, tvoc);
+    EEPROM.get(DATASIZE*pas+EEPROMMARGIN, tim); //reserving the first 128 bytes of EEPROM for reasons
+    EEPROM.get(DATASIZE*pas+EEPROMMARGIN+8, t);
+    EEPROM.get(DATASIZE*pas+EEPROMMARGIN+10, h);
+    EEPROM.get(DATASIZE*pas+EEPROMMARGIN+12, p);
+    EEPROM.get(DATASIZE*pas+EEPROMMARGIN+14, tvoc);
+    //EEPROM.get(DATASIZE*pas+EEPROMMARGIN+16, co2);
   }
 };
 
@@ -365,7 +376,7 @@ RTC_FAST_ATTR uint32_t counter = 0, value = 0;
 void get_stored_data_length(){
   counter = 0, value = 0;
     while(true) {
-        EEPROM.get(18*counter + EEPROMMARGIN, value);
+        EEPROM.get(DATASIZE*counter + EEPROMMARGIN, value);
         Serial.printf("Checked the block");
         Serial.println(counter);
         if (value != 0xffffffff) {break;}
@@ -377,22 +388,6 @@ void get_stored_data_length(){
 /*
 void get_measurement (uint16_t pas){}
 */
-
-/*
-void send_db(){
-WiFiClient client = WebServer.client();
-client.print("HTTP/1.1 200 OK\r\n");
-client.print("Content-Disposition: attachment; filename=config.txt\r\n");
-client.print("Content-Type: application/octet-stream\r\n");
-client.print("Content-Length: 2048\r\n");
-client.print("Connection: close\r\n");
-client.print("Access-Control-Allow-Origin: *\r\n");
-client.print("\r\n");
-client.write((const char*)data, 2048);
-}
-*/
-
-RTC_SLOW_ATTR time_t now = time(nullptr);
 
 void update_time(){
 
@@ -408,45 +403,28 @@ void update_time(){
   week_it = rtc.getDayofWeek();
   Serial.printf("weekday: %u ", week_it);
 	Serial.println();
-
-  //Serial.println(acquiredTime);
-  //uint8_t nWday = (&now/86400L + 4) % 7;
-  //  if(!getLocalTime(&timeinfo)) {Serial.println("Failed to obtain time"); weekday = 0;}
-  //  else{}
-  //previousTime = tv.tv_tsec;  
-  //tv.tv_sec = acquiredTime;
-  //if(nWday < oldWday) nWday += 7;
-  //organise_week(nWday-oldWday); //calls the function to 
-
 }
-
-/*
-void organise_week(int offset){
-float ow_tempmax, ow_tempmin, ow_hummax, ow_hummin, ow_pres;
-uint16_t ow_tvoc, ow_co2;
-
-
-
-}
-*/
-
 
 void save_entry(float val0, float val1, float val2, uint16_t val3){
 
   // This function saves entries to the next 
-
-  regtemp[step] = val0;
-  reghum[step] = val1;
-  regpres[step] = val2;
-  regtvoc[step] = val3;
-  regtime[step] = millis();
+  d_time[step] = rtc.getEpoch();
+  d_temp[step] = val0;
+  d_hum[step] = val1;
+  d_pres[step] = val2;
+  d_tvoc[step] = val3;
   step++;
   if(step > TOTALENTRIES){step = 0;};
 }
 
+void go_to_sleep(uint32_t timer){
+  esp_sleep_enable_timer_wakeup(timer * 1000); //this function takes time in seconds for the ESP32 to wake up from sleep
+  Serial.flush();
+  esp_deep_sleep_start();
+}
+
 void update_params(){
-  //digitalWrite(ENS_CS, LOW);
-  //temperature = aht20.getTemperature();
+
   humidity = aht20.getHumidity();
   //ENS160.setTempAndHum(temperature, humidity);
   
@@ -483,12 +461,14 @@ void update_params(){
     Serial.print("Time: ");
     Serial.println(rtc.getTime("RTC0: %A, %B %d %Y %H:%M:%S"));
 
-  //save_entry(temperature, humidity, pressure, tvoc);
+  
 
   step++;     //increments the big counter
   Serial.println("variable step value = ");  Serial.println(step); //debug
   day_step++; //increments the daily counter
   Serial.println("variable day_step value = ");  Serial.println(day_step); //debug
+  
+  save_entry(temperature, humidity, pressure, tvoc);
   if (day_step >= DAILYENTRIES) {
         shift_week(); day_step=0;
     }
@@ -497,12 +477,12 @@ void update_params(){
 
 
 void store_week_data(){
-  if (temperature > histtemperaturemax[0]) histtemperaturemax[0] = temperature;
-  if (temperature < histtemperaturemin[0]) histtemperaturemin[0] = temperature;
-  if (humidity > histhumiditymax[0]) histhumiditymax[0] = humidity;
-  if (humidity < histhumiditymin[0]) histhumiditymin[0] = humidity;
-  if (pressure < histpressure[0]) histpressure[0] = pressure;
-  if (tvoc > histtvoc[0]) histtvoc[0] = tvoc;  
+  if (temperature > weektemp_H[0]) weektemp_H[0] = temperature;
+  if (temperature < weektemp_L[0]) weektemp_L[0] = temperature;
+  if (humidity > weekhum_H[0]) weekhum_H[0] = humidity;
+  if (humidity < weekhum_L[0]) weekhum_L[0] = humidity;
+  if (pressure < weekpres_L[0]) weekpres_L[0] = pressure;
+  if (tvoc > weektvoc_H[0]) weektvoc_H[0] = tvoc;  
 }
 
 
@@ -512,17 +492,17 @@ void shift_week(){
   uint16_t ow_tvoc, ow_co2;
   for (int8_t i = 6; i>0; i--)
     {
-    histtemperaturemax[i]=histtemperaturemax[i-1];
-    histtemperaturemin[i]=histtemperaturemin[i-1];
-    histhumiditymax[i]=histhumiditymax[i-1];
-    histhumiditymin[i]=histhumiditymin[i-1];
-    histpressure[i]=histpressure[i-1];
-    histtvoc[i]=histtvoc[i-1];
+    weektemp_H[i]=weektemp_H[i-1];
+    weektemp_L[i]=weektemp_L[i-1];
+    weekhum_H[i]=weekhum_H[i-1];
+    weekhum_L[i]=weekhum_L[i-1];
+    weekpres_L[i]=weekpres_L[i-1];
+    weektvoc_H[i]=weektvoc_H[i-1];
     };
-  histtemperaturemax[0], histtemperaturemin[0] = temperature;
-  histhumiditymax[0], histhumiditymin[0] = humidity;
-  histpressure[0] = pressure;
-  histtvoc[0] = tvoc;
+  weektemp_H[0], weektemp_L[0] = temperature;
+  weekhum_H[0], weekhum_L[0] = humidity;
+  weekpres_L[0] = pressure;
+  weektvoc_H[0] = tvoc;
 }
 
 
@@ -548,22 +528,22 @@ String processor(const String& var){
       String combined = "";
       //char* combined = "";
       //char[384] combined;
-      for(float i: histtemperaturemax){combined+= String(i, 1) + ",";};
-      for(float i: histtemperaturemin){combined+= String(i, 1) + ",";};
-      for(float i: histhumiditymax){combined+= String(i, 1) + ",";};
-      for(float i: histhumiditymin){combined+= String(i, 1) + ",";};
-      for(float i: histpressure){combined+= String(i, 1) + ",";};
-      for(int i = 0; i<6; i++){combined+= String(histtvoc[i]) + ",";};
-      combined+= String(histtvoc[6]);
+      for(float i: weektemp_H){combined+= String(i, 1) + ",";};
+      for(float i: weektemp_L){combined+= String(i, 1) + ",";};
+      for(float i: weekhum_H){combined+= String(i, 1) + ",";};
+      for(float i: weekhum_L){combined+= String(i, 1) + ",";};
+      for(float i: weekpres_L){combined+= String(i, 1) + ",";};
+      for(int i = 0; i<6; i++){combined+= String(weektvoc_H[i]) + ",";};
+      combined+= String(weektvoc_H[6]);
 
       /*
       for (uint8_t i = 0; i<7; i++){
-        combined += String(histtemperaturemax[i], 1) + ",";
-        combined += String(histtemperaturemin[i], 1) + ",";
-        combined += String(histhumiditymax[i], 1) + ",";
-        combined += String(histhumiditymin[i], 1) + ",";
-        combined += String(histpressure[i], 1) + ","
-        combined += String(histtvoc[i]) + ",";
+        combined += String(weektemp_H[i], 1) + ",";
+        combined += String(weektemp_L[i], 1) + ",";
+        combined += String(weekhum_H[i], 1) + ",";
+        combined += String(weekhum_L[i], 1) + ",";
+        combined += String(weekpres_L[i], 1) + ","
+        combined += String(weektvoc_H[i]) + ",";
         combined.pop_back();
       };
       */
@@ -750,10 +730,8 @@ const char settime_html[] PROGMEM = R"rawliteral(
 <h2 id="date"></h2><br>
 <button onclick="sdt()">Sync</button>
 <script>
-function updt(){document.getElementById("date").innerHTML=Date.now()/1000>>0;}
-updt();
 sdt();
-setInterval(updt,1000);
+setInterval(()=>{document.getElementById("date").innerHTML=Date.now()/1000>>0;},1000);
 function sdt(){
     var xhr = new XMLHttpRequest();
     let tn = Date.now()/1000>>0;
@@ -775,6 +753,25 @@ void sendHistory(){
   response->print();
 }
 */
+/*
+void sendHistory(){
+  String line = "";
+  request->send_P(200, "text/html", "<!DOCTYPE html><html>");
+  for(int i=0; i<step; i++){
+    line+= String(d_time[i])+";"+String(d_temp[i], 2)+";"+String(d_hum[i], 2)+";"+String(d_pres[i], 2)+";"+String(d_tvoc[i])+"\n <br>";
+    request->send_P(200, "text/html", line);
+    line="";
+  }
+  request->send_P("</body></html>");
+}
+*/
+
+void notFound(AsyncWebServerRequest *request) {
+  request->send(404, "text/plain", "Not found");
+}
+
+   uint32_t indexvReal = 0;
+
 
 class CaptiveRequestHandler : public AsyncWebHandler {
 public:
@@ -786,18 +783,58 @@ public:
       acquiredTime = request->getParam("settime")->value().toInt();
       update_time();
       Serial.printf("Time received: %lu \n", acquiredTime);
-      Serial.println();
+      Serial.println(); 
     }
   });
 
-  server.on("/history", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send_P(200, "text/html", "<html>History goes here</html>");
 
-    Serial.println("history page loaded on client");
-    Serial.println();
+
+  server.on("/history", HTTP_GET, [](AsyncWebServerRequest *request) {
+  AsyncResponseStream *response = request->beginResponseStream("text/plain; charset=UTF-8");
+  for (uint32_t i = 0; i < step; i++){
+    response->print(String(d_time[i])+";"+String(d_temp[i], 2)+";"+String(d_hum[i], 2)+";"+String(d_pres[i], 2)+";"+String(d_tvoc[i])+"\n");
+  }
+  request->send(response);
   });
 
+
+
+//
+/*
+  server.on("/history", HTTP_GET, [](AsyncWebServerRequest * request)
+  {
+    indexvReal = 0;
+    AsyncWebServerResponse* response = request->beginChunkedResponse(contentType,
+                                       [](uint8_t* buffer, size_t maxLen, size_t index)
+    {
+      maxLen = maxLen >> 1;
+      size_t len = 0;
+      if (indexvReal == 0)
+      {
+        len += sprintf(((char *)buffer), "[%g", vReal[indexvReal]);
+        indexvReal++;
+      }
+      while (len < (maxLen - 16) && indexvReal < LEN(step))
+      {
+        len += sprintf(((char *)buffer + len), ",%g", vReal[indexvReal]);
+        indexvReal++;
+      }
+      if (indexvReal == LEN(step))
+      {
+        len += sprintf(((char *)buffer + len), "]");
+        indexvReal++;
+      }
+      return len;
+    });
+    request->send(response);
+  });
+*/
+
+
+//
+
   }
+
   virtual ~CaptiveRequestHandler() {}
 
 
@@ -842,9 +879,18 @@ void setupServer() {
     }
   });
 
-  server.on("/history", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send_P(200, "text/html", "<html>History goes here</html>");
+server.on("/history", HTTP_GET, [](AsyncWebServerRequest *request) {
+  AsyncResponseStream *response = request->beginResponseStream("text/plain; charset=UTF-8");
+  for (uint32_t i = 0; i < step; i++){
+    response->print(String(d_time[i])+";"+String(d_temp[i], 2)+";"+String(d_hum[i], 2)+";"+String(d_pres[i], 2)+";"+String(d_tvoc[i])+"\n");
+  }
+  request->send(response);
   });
+  
+
+  /*server.on("/history", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send_P(200, "text/html", "<html>History goes here</html>");
+  });*/
   
   server.onNotFound([](AsyncWebServerRequest *request){request->send_P(200, "text/html", index_html, processor);});
 
