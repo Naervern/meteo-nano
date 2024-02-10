@@ -22,17 +22,17 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-
-#ifndef BME280_I2C.h
-#define BME280_I2C.h
-#endif
 #include <Wire.h>
 #include <Arduino.h>
 
 class BME280_I2C{
+    
     public:
+
     const uint8_t ADDRESS = 0x76; //default address is 0x76
+
     BME280_I2C(){}
+
     BME280_I2C(const uint8_t& x) : ADDRESS(x) {}
 
     uint8_t osrs_t = 1;             //Temperature oversampling x 1
