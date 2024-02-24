@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<header>
+
+</header>
+<main>
+
+</main>
+<script>
+// Creates new WebSocket object with a wss URI as the parameter
+const socket = new WebSocket('wss://game.example.com/ws/updates');
+
+// Fired when a connection with a WebSocket is opened
+socket.onopen = function () {
+  setInterval(function() {
+    if (socket.bufferedAmount == 0)
+      socket.send(getUpdateData());
+  }, 50);
+};
+
+// Fired when data is received through a WebSocket
+socket.onmessage = function(event) {
+  handleUpdateData(event.data);
+  ()=>{
+    //document.getElementById("data").innerHTML +=
+    
+    let t, tp, h, p, oc, c;
+    main.innerHTML += 
+    
+    }
+};
+
+// Fired when a connection with a WebSocket is closed
+socket.onclose = function(event) {
+  onSocketClose(event);
+};
+
+// Fired when a connection with a WebSocket has been closed because of an error
+socket.onerror = function(event) {
+  onSocketError(event);
+};
+</script>
+</html>
