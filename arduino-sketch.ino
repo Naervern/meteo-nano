@@ -1,7 +1,8 @@
 #include <DNSServer.h>
 #include <WiFi.h>
 #include <AsyncTCP.h>
-#include <AsyncFsWebServer.h>
+//#include <AsyncFsWebServer.h>
+#include <ESPAsyncWebServer.h>
 #include <ESP32Time.h>
 #include "AsyncUDP.h"
 #include <AHT20.h>
@@ -385,18 +386,7 @@ void get_stored_data_length(){
   step = counter;
 }
 
-/*
-void get_measurement (uint16_t pas){}
-*/
-
 void update_time(){
-
-  //struct tm * timeinfo;
-  //localtime_r(&now, timeinfo);
-
- //timeval tv;
- //     tv.tv_sec = (time_t)acquiredTime;  // epoch time (seconds)
- //     tv.tv_usec = 0;  
 
   rtc.setTime(acquiredTime);
   Serial.println("update time function called");
@@ -767,7 +757,7 @@ void sendHistory(){
 */
 
 void notFound(AsyncWebServerRequest *request) {
-  request->send(404, "text/plain", "Not found");
+  request->send(404, "text/plain", "Err 404 Not found");
 }
 
    uint32_t indexvReal = 0;
@@ -788,13 +778,75 @@ public:
   });
 
 
-
   server.on("/history", HTTP_GET, [](AsyncWebServerRequest *request) {
-  AsyncResponseStream *response = request->beginResponseStream("text/plain; charset=UTF-8");
-  for (uint32_t i = 0; i < step; i++){
-    response->print(String(d_time[i])+";"+String(d_temp[i], 2)+";"+String(d_hum[i], 2)+";"+String(d_pres[i], 2)+";"+String(d_tvoc[i])+"\n");
-  }
-  request->send(response);
+    //AsyncResponseStream *response = request->beginResponseStream("text/plain; charset=UTF-8");
+    
+    /*
+        AsyncWebServerResponse * AsyncWebServerRequest::beginChunkedResponse(const String& contentType, AwsResponseFiller callback, AwsTemplateProcessor templateCallback){
+        if(_version) return new AsyncChunkedResponse(contentType, callback, templateCallback);
+        return new AsyncCallbackResponse(contentType, 0, callback, templateCallback);}*/
+
+      //request->beginChunkedResponse( "text/html", charset=UTF-8); ???
+      request->beginChunkedResponse("text/plain; charset=UTF-8");
+      
+
+    /*
+        void AsyncWebServerRequest::sendChunked(const String& contentType, AwsResponseFiller callback, AwsTemplateProcessor templateCallback){
+        send(beginChunkedResponse(contentType, callback, templateCallback));}*/
+
+      //request->sendChunked( "text/html", charset=UTF-8); ???
+      request->sendChunked( "text/plain", "Data history\n");
+      request->sendChunked( "text/plain", "device date: ");
+      request->sendChunked( "text/plain", (String)rtc.getTime("RTC0: %A, %B %d %Y %H:%M:%S"));
+      request->sendChunked( "text/plain", "\nepoch time: ");
+      request->sendChunked( "text/plain", (String)rtc.getEpoch());
+      request->sendChunked( "text/plain", "\n Data format is:\n Epoch time-seconds; temperature-°C; humidity-%; pressure-hPa; TVOC-ppb\n\n");
+      
+      Serial.println();
+      Serial.println("Sending all database to client:");
+
+      //beginning the data rows
+      for (uint32_t pas = 0; i < step; i++) {
+        
+          String row = "\n";
+          time_t tim;
+          int16_t t;
+          int16_t h;
+          uint16_t p;
+          uint16_t tvoc;
+          //uint16_t co2;
+
+          EEPROM.get(DATASIZE*pas+EEPROMMARGIN, tim);
+          EEPROM.get(DATASIZE*pas+EEPROMMARGIN+8, t);
+          EEPROM.get(DATASIZE*pas+EEPROMMARGIN+10, h);
+          EEPROM.get(DATASIZE*pas+EEPROMMARGIN+12, p);
+          EEPROM.get(DATASIZE*pas+EEPROMMARGIN+14, tvoc);
+
+        row += (String)tim + ";";
+        row += (String)(t/100) + "." + (String)(t%100) + ";";
+        row += (String)(h/100) + "." + (String)(h%100) + ";";
+        row += (String)(p/100+500) + "." + (String)(p%100) + ";";
+        row += (String)tvoc + ";";
+        request->sendChunked( "text/plain", row);
+
+        Serial.println(row);
+      }
+
+      request->send_P(200, "text/html", "\nfinished");
+
+    
+      /*
+      AsyncWebServerResponse * AsyncWebServerRequest::beginChunkedResponse(const String& contentType, AwsResponseFiller callback, AwsTemplateProcessor templateCallback){
+        if(_version) return new AsyncChunkedResponse(contentType, callback, templateCallback);
+        return new AsyncCallbackResponse(contentType, 0, callback, templateCallback);
+      }
+      */
+
+    //for (uint32_t i = 0; i < step; i++){
+    //response->print(String(d_time[i])+";"+String(d_temp[i], 2)+";"+String(d_hum[i], 2)+";"+String(d_pres[i], 2)+";"+String(d_tvoc[i])+"\n");  }
+    //request->send(response);
+
+
   });
 
 
@@ -880,17 +932,15 @@ void setupServer() {
   });
 
 server.on("/history", HTTP_GET, [](AsyncWebServerRequest *request) {
+  
+  /*
   AsyncResponseStream *response = request->beginResponseStream("text/plain; charset=UTF-8");
   for (uint32_t i = 0; i < step; i++){
     response->print(String(d_time[i])+";"+String(d_temp[i], 2)+";"+String(d_hum[i], 2)+";"+String(d_pres[i], 2)+";"+String(d_tvoc[i])+"\n");
   }
   request->send(response);
+  */
   });
-  
-
-  /*server.on("/history", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send_P(200, "text/html", "<html>History goes here</html>");
-  });*/
   
   server.onNotFound([](AsyncWebServerRequest *request){request->send_P(200, "text/html", index_html, processor);});
 
@@ -904,16 +954,6 @@ void setup() {
   EEPROM.begin(EEPROM_SIZE);
   Serial.begin(115200);
   Wire.begin();
-
-  //while (!Serial) {}; // wait for serial port to connect. Needed for native USB port only, easier debugging :P
-  //delay(2000); //debug stuff
-  /*
-  regtemp = (float *) ps_malloc (TOTALENTRIES * sizeof (float));
-  reghum = (float *) ps_malloc (TOTALENTRIES * sizeof (float));
-  regpres = (float *) ps_malloc (TOTALENTRIES * sizeof (float));
-  regtvoc = (uint16_t *) ps_malloc (TOTALENTRIES * sizeof (unsigned int));
-  regtime = (unsigned long *) ps_malloc (TOTALENTRIES * sizeof (unsigned long));
-  */
 
   if(psramInit()){
     Serial.println("\nPSRAM is correctly initialized");
@@ -976,18 +1016,9 @@ void loop() {
   if ((millis() - lastTime) > TIMERDELAY * 1000) {
     ens160.setOperatingMode(0x02);
     update_params();
-    //ens160.setOperatingMode(0x02);
-    //store_week_data();
     Serial.println("...");
     Serial.println();
 
-    //Send Events to the Web Client with the Sensor Readings
-    //events.send("ping",NULL,millis());
-    //events.send(String(temperature).c_str(),"temperature",millis());
-    //events.send(String(humidity).c_str(),"humidity",millis());
-    //Serial.println("events sent:");
-    //Serial.println();
-    
     lastTime = millis();
   }
   
@@ -995,142 +1026,88 @@ void loop() {
 
 
 
+/*
 
-// Excerpt from ESP_AsyncFSBrowser example
+ESPAsyncFSFileServer example functions
 
-void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventType type, void * arg, uint8_t *data, size_t len){
-  if(type == WS_EVT_CONNECT){
-    Serial.printf("ws[%s][%u] connect\n", server->url(), client->id());
-    client->printf("Hello Client %u :)", client->id());
-    client->ping();
-  } else if(type == WS_EVT_DISCONNECT){
-    Serial.printf("ws[%s][%u] disconnect\n", server->url(), client->id());
-  } else if(type == WS_EVT_ERROR){
-    Serial.printf("ws[%s][%u] error(%u): %s\n", server->url(), client->id(), *((uint16_t*)arg), (char*)data);
-  } else if(type == WS_EVT_PONG){
-    Serial.printf("ws[%s][%u] pong[%u]: %s\n", server->url(), client->id(), len, (len)?(char*)data:"");
-  } else if(type == WS_EVT_DATA){
-    AwsFrameInfo * info = (AwsFrameInfo*)arg;
-    String msg = "";
-    if(info->final && info->index == 0 && info->len == len){
-      //the whole message is in a single frame and we got all of it's data
-      Serial.printf("ws[%s][%u] %s-message[%llu]: ", server->url(), client->id(), (info->opcode == WS_TEXT)?"text":"binary", info->len);
+*/
 
-      if(info->opcode == WS_TEXT){
-        for(size_t i=0; i < info->len; i++) {
-          msg += (char) data[i];
-        }
-      } else {
-        char buff[3];
-        for(size_t i=0; i < info->len; i++) {
-          sprintf(buff, "%02x ", (uint8_t) data[i]);
-          msg += buff ;
-        }
-      }
-      Serial.printf("%s\n",msg.c_str());
+/*
+AsyncFsWebServer server(80, LittleFS, "myServer");
+bool captiveRun = false;
 
-      if(info->opcode == WS_TEXT)
-        client->text("I got your text message");
-      else
-        client->binary("I got your binary message");
-    } else {
-      //message is comprised of multiple frames or the frame is split into multiple packets
-      if(info->index == 0){
-        if(info->num == 0)
-          Serial.printf("ws[%s][%u] %s-message start\n", server->url(), client->id(), (info->message_opcode == WS_TEXT)?"text":"binary");
-        Serial.printf("ws[%s][%u] frame[%u] start[%llu]\n", server->url(), client->id(), info->num, info->len);
-      }
-
-      Serial.printf("ws[%s][%u] frame[%u] %s[%llu - %llu]: ", server->url(), client->id(), info->num, (info->message_opcode == WS_TEXT)?"text":"binary", info->index, info->index + len);
-
-      if(info->opcode == WS_TEXT){
-        for(size_t i=0; i < len; i++) {
-          msg += (char) data[i];
-        }
-      } else {
-        char buff[3];
-        for(size_t i=0; i < len; i++) {
-          sprintf(buff, "%02x ", (uint8_t) data[i]);
-          msg += buff ;
-        }
-      }
-      Serial.printf("%s\n",msg.c_str());
-
-      if((info->index + len) == info->len){
-        Serial.printf("ws[%s][%u] frame[%u] end[%llu]\n", server->url(), client->id(), info->num, info->len);
-        if(info->final){
-          Serial.printf("ws[%s][%u] %s-message end\n", server->url(), client->id(), (info->message_opcode == WS_TEXT)?"text":"binary");
-          if(info->message_opcode == WS_TEXT)
-            client->text("I got your text message");
-          else
-            client->binary("I got your binary message");
-        }
-      }
-    }
+void handleLed(AsyncWebServerRequest *request) {
+  static int value = false;
+  // http://xxx.xxx.xxx.xxx/led?val=1
+  if(request->hasParam("val")) {
+    value = request->arg("val").toInt();
+    digitalWrite(ledPin, value);
   }
+  String reply = "LED is now ";
+  reply += value ? "ON" : "OFF";
+  request->send(200, "text/plain", reply);
 }
 
 
+*/
 
-WiFiClient client = new AsyncWebSocketClient;
 
-void serialize_array(Print &client, int *data, int count) {
-    client.print('[');
-    for (int i = 0; i < count; i++) {
-        client.print(data[i]);
-        client.print(i==count-1 ? ']' : ',');
-    }
+
+/*
+* Getting FS info (total and free bytes) is strictly related to
+* filesystem library used (LittleFS, FFat, SPIFFS etc etc) and ESP framework
+*/
+
+
+/*
+#ifdef ESP32
+void getFsInfo(fsInfo_t* fsInfo) {
+    fsInfo->totalBytes = LittleFS.totalBytes();
+    fsInfo->usedBytes = LittleFS.usedBytes();
+    strcpy(fsInfo->fsName, "LittleFS");
 }
+#endif
+*/
 
 
 
-// from given example
 
-#ifndef FS_WEBSERVER_H
-#define FS_WEBSERVER_H
+//setup functions
 
-#include <WebServer.h>
-class fs_WebServer : public WebServer
-{
-  public:
-    fs_WebServer(IPAddress addr, int port): WebServer(addr, port){ }
-    fs_WebServer(int port = 80): WebServer(port) {
-    }
-   using WebServer:: send_P;
-    void send_P(int code, PGM_P content_type, PGM_P content) {
-      size_t contentLength = 0;
+/*
 
-      if (content != NULL) {
-        contentLength = strlen_P(content);
-      }
-
-      String header;
-      char type[64];
-      memccpy_P((void*)type, (PGM_VOID_P)content_type, 0, sizeof(type));
-      _prepareHeader(header, code, (const char* )type, contentLength);
-      _currentClientWrite(header.c_str(), header.length());
-      if (contentLength) {  // if rajouté par FS ...........................+++++
-        sendContent_P(content);
-      }
+    IPAddress myIP = server.startWiFi(15000);
+    if (!myIP) {
+        Serial.println("\n\nNo WiFi connection, start AP and Captive Portal\n");
+        myIP = WiFi.softAPIP();
+        Serial.print("My IP 1 ");
+        Serial.println(myIP.toString());
+        server.startCaptivePortal("ESP_AP", "123456789", "/setup");
+        myIP = WiFi.softAPIP();
+        Serial.print("\nMy IP 2 ");
+        Serial.println(myIP.toString());
+        captiveRun = true;
     }
 
-    bool chunkedResponseModeStart_P (int code, PGM_P content_type) {
-      if (_currentVersion == 0)
-        // no chunk mode in HTTP/1.0
-        return false;
-      setContentLength(CONTENT_LENGTH_UNKNOWN);
-      send_P(code, content_type, "");
-      return true;
-    }
-    bool chunkedResponseModeStart (int code, const char* content_type) {
-      return chunkedResponseModeStart_P(code, content_type);
-    }
-    bool chunkedResponseModeStart (int code, const String& content_type) {
-      return chunkedResponseModeStart_P(code, content_type.c_str());
-    }
-    void chunkedResponseFinalize () {
-      sendContent(emptyString);
-    }
-};
-#endif // FS_WEBSERVER_H
+    server.on("/", HTTP_GET, handleLed);
+    server.on("/time", HTTP_GET, handleLed);
+    server.on("/history", HTTP_GET, handleLed);
 
+    // Set a custom /setup page title
+    server.setSetupPageTitle("Simple Async FS Captive Web Server");
+
+    // Enable ACE FS file web editor and add FS info callback fucntion
+    server.enableFsCodeEditor();
+    #ifdef ESP32
+    server.setFsInfoCallback(getFsInfo);
+    #endif
+
+        // Start server
+    server.init();
+
+
+    //loop function
+
+    if (captiveRun)
+        server.updateDNS();
+*/
