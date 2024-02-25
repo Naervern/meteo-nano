@@ -1,3 +1,4 @@
+#include <Arduino.h>
 #include <DNSServer.h>
 #include <WiFi.h>
 #include <AsyncTCP.h>
@@ -24,7 +25,7 @@ DNSServer dnsServer;
 AsyncWebServer server(80);
 //AsyncWebServer timeserver(80);
 //AsyncWebServer historyserver(80);
-AsyncEventSource events("/events");
+//AsyncEventSource events("/events");
 
 RTC_SLOW_ATTR unsigned long lastTime = 0;   
 const unsigned long timerDelay = 30000;
@@ -444,6 +445,37 @@ void save_entry(float val0, float val1, float val2, uint16_t val3){
   if(step > TOTALENTRIES){step = 0;};
 }
 
+
+void store_week_data(){
+  if (temperature > histtemperaturemax[0]) histtemperaturemax[0] = temperature;
+  if (temperature < histtemperaturemin[0]) histtemperaturemin[0] = temperature;
+  if (humidity > histhumiditymax[0]) histhumiditymax[0] = humidity;
+  if (humidity < histhumiditymin[0]) histhumiditymin[0] = humidity;
+  if (pressure < histpressure[0]) histpressure[0] = pressure;
+  if (tvoc > histtvoc[0]) histtvoc[0] = tvoc;
+}
+
+
+void shift_week(){
+  Serial.println("shift_week function executed."); //debug
+  float ow_tempmax, ow_tempmin, ow_hummax, ow_hummin, ow_pres;
+  uint16_t ow_tvoc, ow_co2;
+  for (uint8_t i = 6; i>0; i--)
+    {
+    histtemperaturemax[i]=histtemperaturemax[i-1];
+    histtemperaturemin[i]=histtemperaturemin[i-1];
+    histhumiditymax[i]=histhumiditymax[i-1];
+    histhumiditymin[i]=histhumiditymin[i-1];
+    histpressure[i]=histpressure[i-1];
+    histtvoc[i]=histtvoc[i-1];
+    };
+  histtemperaturemax[0], histtemperaturemin[0] = temperature;
+  histhumiditymax[0], histhumiditymin[0] = humidity;
+  histpressure[0] = pressure;
+  histtvoc[0] = tvoc;
+}
+
+
 void update_params(){
   //digitalWrite(ENS_CS, LOW);
   //temperature = aht20.getTemperature();
@@ -495,35 +527,6 @@ void update_params(){
   else store_week_data();
 }
 
-
-void store_week_data(){
-  if (temperature > histtemperaturemax[0]) histtemperaturemax[0] = temperature;
-  if (temperature < histtemperaturemin[0]) histtemperaturemin[0] = temperature;
-  if (humidity > histhumiditymax[0]) histhumiditymax[0] = humidity;
-  if (humidity < histhumiditymin[0]) histhumiditymin[0] = humidity;
-  if (pressure < histpressure[0]) histpressure[0] = pressure;
-  if (tvoc > histtvoc[0]) histtvoc[0] = tvoc;
-}
-
-
-void shift_week(){
-  Serial.println("shift_week function executed."); //debug
-  float ow_tempmax, ow_tempmin, ow_hummax, ow_hummin, ow_pres;
-  uint16_t ow_tvoc, ow_co2;
-  for (uint8_t i = 6; i>0; i--)
-    {
-    histtemperaturemax[i]=histtemperaturemax[i-1];
-    histtemperaturemin[i]=histtemperaturemin[i-1];
-    histhumiditymax[i]=histhumiditymax[i-1];
-    histhumiditymin[i]=histhumiditymin[i-1];
-    histpressure[i]=histpressure[i-1];
-    histtvoc[i]=histtvoc[i-1];
-    };
-  histtemperaturemax[0], histtemperaturemin[0] = temperature;
-  histhumiditymax[0], histhumiditymin[0] = humidity;
-  histpressure[0] = pressure;
-  histtvoc[0] = tvoc;
-}
 
 
 String processor(const String& var){
@@ -902,7 +905,7 @@ void setup() {
   dnsServer.start(53, "*", WiFi.softAPIP());
 
 
-
+  /*
   events.onConnect([](AsyncEventSourceClient *client){
     if(client->lastId()){
       //Serial.printf("Client reconnected! Last message ID that it got is: %u\n", client->lastId());
@@ -911,9 +914,9 @@ void setup() {
     // and set reconnect delay to 1 second
     client->send("hello!", NULL, millis(), 1000);
   });
+  */
 
   server.addHandler(new CaptiveRequestHandler()).setFilter(ON_AP_FILTER);  //only when requested from AP
-  server.addHandler(&events);
 
   setupServer();
 
