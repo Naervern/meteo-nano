@@ -24,6 +24,7 @@
 
 #include <Wire.h>
 #include <Arduino.h>
+#include "BME280_I2C.h"
 
 class BME280_I2C{
     
