@@ -14,6 +14,7 @@
 #define TOTALENTRIES 57600  // Total entries to be stored in the EEPROM
 #define DAILYENTRIES 144    // How many measurements expected to be done during a day. If every 24h/10min = 144
 #define EEPROMMARGIN 128    // Bytes reserved in the beginning of the EEPROM, before the storage space of the measurements
+#define DATASIZE 16         // The sum of all enabled stored data types. 8 bytes time_t, plus 3 * int16_t and one uint_16 = 16 bytes
 
 #define AHT21_ADDRESS 0x38
 #define ENS160_ADDRESS 0x53
@@ -331,32 +332,38 @@ inline void rtc_alloc(){
 #define EEPROM_SIZE 3145728 //size of the flash memory to be reserved. 3145728 = 3MB
 
 void store_measurement(uint16_t step){
-  byte byteARR[18] = {0xFF};
+  byte byteARR[DATASIZE] = {0xFF};
 
   for (uint8_t i=0; i<DAILYENTRIES; i++){             //reserving the first 128 bytes of EEPROM for reasons
-    //18*( step - DAILYENTRIES + i + 1 ) + EEPROMMARGIN -> for the start. This is called for the first time when the value of variable step is 144.
-    EEPROM.put(18*(step+i-DAILYENTRIES+1)+EEPROMMARGIN, d_time[i]);   //first variable, 4 bytes (unsigned long) - UNIX time
-    EEPROM.put(18*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+4, d_temp[i]);   //second variable, 4 bytes (float) - temperature in degC
-    EEPROM.put(18*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+8, d_hum[i]);    //second variable, 4 bytes (float) - humidity in %
-    EEPROM.put(18*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+12, d_pres[i]);   //second variable, 4 bytes (float) - pressure in hPa
-    EEPROM.put(18*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+16, d_tvoc[i]);    //second variable, 2 bytes (uint16_t) - TVOC in ppb
+    //DATASIZE*( step - DAILYENTRIES + i + 1 ) + EEPROMMARGIN -> for the start. This is called for the first time when the value of variable step is DAILYENTRIES.
+    EEPROM.put(DATASIZE*(step+i-DAILYENTRIES+1)+EEPROMMARGIN, d_time[i]);   //first variable, 8 bytes (time_t) - UNIX time
+    EEPROM.put(DATASIZE*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+8, d_temp[i]);   //second variable, 2 bytes (int16_t) - temperature in degC with 0.01 degree
+    EEPROM.put(DATASIZE*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+10, d_hum[i]);    //second variable, 2 bytes (int16_t) - humidity in %
+    EEPROM.put(DATASIZE*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+12, d_pres[i]);   //second variable, 2 bytes (int16_t) - pressure in hPa
+    EEPROM.put(DATASIZE*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+14, d_tvoc[i]);    //second variable, 2 bytes (uint16_t) - TVOC in ppb
+    //EEPROM.put(DATASIZE*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+16, d_co2[i]);    //second variable, 2 bytes (uint16_t) - eCO2 in ppm --- disabled in this example
   };
 }
 
 class readEntry {
   public:
-    unsigned long tim;
+    time_t tim;
     float temp;
     float hum;
     float pres;
     uint16_t tvoc;
+    //uint16_t co2;
+    int16_t t;
+    int16_t h;
+    int16_t p;
   
   void get_measurement (uint32_t pas){
-    EEPROM.get(18*pas+EEPROMMARGIN, tim); //reserving the first 128 bytes of EEPROM for reasons
-    EEPROM.get(18*pas+EEPROMMARGIN+4, temp);
-    EEPROM.get(18*pas+EEPROMMARGIN+8, hum);
-    EEPROM.get(18*pas+EEPROMMARGIN+12, pres);
-    EEPROM.get(18*pas+EEPROMMARGIN+16, tvoc);
+    EEPROM.get(DATASIZE*pas+EEPROMMARGIN, tim); //reserving the first 128 bytes of EEPROM for reasons
+    EEPROM.get(DATASIZE*pas+EEPROMMARGIN+8, t);
+    EEPROM.get(DATASIZE*pas+EEPROMMARGIN+10, h);
+    EEPROM.get(DATASIZE*pas+EEPROMMARGIN+12, p);
+    EEPROM.get(DATASIZE*pas+EEPROMMARGIN+14, tvoc);
+    //EEPROM.get(DATASIZE*pas+EEPROMMARGIN+16, co2);
   }
 };
 
@@ -767,7 +774,7 @@ function sdt(){
 
 )rawliteral";
 
-/*
+
 void sendHistory(){
   server client = server.available();
   response->print("<!DOCTYPE html><html>");
@@ -776,8 +783,51 @@ void sendHistory(){
   }
   response->print("</body></html>");
   response->print();
+
+        void AsyncWebServerRequest::sendChunked(const String& contentType, AwsResponseFiller callback, AwsTemplateProcessor templateCallback){
+        send(beginChunkedResponse(contentType, callback, templateCallback));}
+
+      request->sendChunked( "text/plain", "Data history\n");
+      request->sendChunked( "text/plain", "device date: ");
+      request->sendChunked( "text/plain", (String)rtc.getTime("RTC0: %A, %B %d %Y %H:%M:%S"));
+      request->sendChunked( "text/plain", "\nepoch time: ");
+      request->sendChunked( "text/plain", (String)rtc.getEpoch());
+      request->sendChunked( "text/plain", "\n Data format is:\n Epoch time-seconds; temperature-°C; humidity-%; pressure-hPa; TVOC-ppb\n\n");
+      
+      Serial.println();
+      Serial.println("Sending all database to client:");
+
+      //beginning the data rows
+      for (uint32_t pas = 0; i < step; i++) {
+        
+          String row = "\n";
+          time_t tim;
+          int16_t t;
+          int16_t h;
+          uint16_t p;
+          uint16_t tvoc;
+          //uint16_t co2;
+
+          EEPROM.get(DATASIZE*pas+EEPROMMARGIN, tim);
+          EEPROM.get(DATASIZE*pas+EEPROMMARGIN+8, t);
+          EEPROM.get(DATASIZE*pas+EEPROMMARGIN+10, h);
+          EEPROM.get(DATASIZE*pas+EEPROMMARGIN+12, p);
+          EEPROM.get(DATASIZE*pas+EEPROMMARGIN+14, tvoc);
+
+        row += (String)tim + ";";
+        row += (String)(t/100) + "." + (String)(t%100) + ";";
+        row += (String)(h/100) + "." + (String)(h%100) + ";";
+        row += (String)(p/100+500) + "." + (String)(p%100) + ";";
+        row += (String)tvoc + ";";
+        request->sendChunked( "text/plain", row);
+
+        Serial.println(row);
+      }
+
+      request->send_P(200, "text/html", "\nfinished");
+
+
 }
-*/
 
 class CaptiveRequestHandler : public AsyncWebHandler {
 public:
