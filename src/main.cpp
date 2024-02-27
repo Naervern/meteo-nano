@@ -775,44 +775,75 @@ function sdt(){
 )rawliteral";
 
 
-void sendHistory(){
-  server client = server.available();
-  response->print("<!DOCTYPE html><html>");
-  for(int i=0; i<TOTALENTRIES; i++){
-    response->print(String(regtime[i])+";"+String(regtemp[i], 2)+";"+String(reghum[i], 2)+";"+String(regpres[i], 2)+";"+String(regpol[i])+"\n");
-  }
-  response->print("</body></html>");
-  response->print();
+void sendHistory(AsyncWebServerRequest *request){
 
-        void AsyncWebServerRequest::sendChunked(const String& contentType, AwsResponseFiller callback, AwsTemplateProcessor templateCallback){
-        send(beginChunkedResponse(contentType, callback, templateCallback));}
+      Serial.println();
+      Serial.println("Sending all database to client:");
 
+    static size_t dataLen = (step+1)*(DATASIZE*3+16);
+
+    AsyncWebServerResponse *response = request->beginChunkedResponse("application/octet-stream", [](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
+
+      String row = "\n";
+      size_t len = (dataLen>maxLen)?maxLen:dataLen;
+
+      if (len>0)
+      {
+        memcpy(buffer, &row, len);
+        dataLen -= len;
+        index += len;
+        
+      }
+
+      
+      return len;
+      
+    });
+    response->setContentLength(dataLen);
+    request->send(response);
+
+    //AsyncResponseStream *response = request->beginResponseStream("text/plain; charset=UTF-8");
+    
+    /*
+        AsyncWebServerResponse * AsyncWebServerRequest::beginChunkedResponse(const String& contentType, AwsResponseFiller callback, AwsTemplateProcessor templateCallback){
+        if(_version) return new AsyncChunkedResponse(contentType, callback, templateCallback);
+        return new AsyncCallbackResponse(contentType, 0, callback, templateCallback);}
+
+    //for (uint32_t i = 0; i < step; i++){
+    //response->print(String(d_time[i])+";"+String(d_temp[i], 2)+";"+String(d_hum[i], 2)+";"+String(d_pres[i], 2)+";"+String(d_tvoc[i])+"\n");  }
+    //request->send(response);
+*/
+
+      //  void AsyncWebServerRequest::sendChunked(const String& contentType, AwsResponseFiller callback, AwsTemplateProcessor templateCallback){
+      //  send(beginChunkedResponse(contentType, callback, templateCallback));}
+
+      /*
       request->sendChunked( "text/plain", "Data history\n");
       request->sendChunked( "text/plain", "device date: ");
       request->sendChunked( "text/plain", (String)rtc.getTime("RTC0: %A, %B %d %Y %H:%M:%S"));
       request->sendChunked( "text/plain", "\nepoch time: ");
-      request->sendChunked( "text/plain", (String)rtc.getEpoch());
+      request->sendChunked( "text/plain", rtc.getEpoch().to_chars());
       request->sendChunked( "text/plain", "\n Data format is:\n Epoch time-seconds; temperature-°C; humidity-%; pressure-hPa; TVOC-ppb\n\n");
-      
-      Serial.println();
-      Serial.println("Sending all database to client:");
+      */
+
+
 
       //beginning the data rows
       for (uint32_t pas = 0; i < step; i++) {
         
           String row = "\n";
-          time_t tim;
-          int16_t t;
-          int16_t h;
-          uint16_t p;
-          uint16_t tvoc;
+          time_t tim0;
+          int16_t t0;
+          int16_t h0;
+          uint16_t p0;
+          uint16_t vc;
           //uint16_t co2;
 
           EEPROM.get(DATASIZE*pas+EEPROMMARGIN, tim);
           EEPROM.get(DATASIZE*pas+EEPROMMARGIN+8, t);
           EEPROM.get(DATASIZE*pas+EEPROMMARGIN+10, h);
           EEPROM.get(DATASIZE*pas+EEPROMMARGIN+12, p);
-          EEPROM.get(DATASIZE*pas+EEPROMMARGIN+14, tvoc);
+          EEPROM.get(DATASIZE*pas+EEPROMMARGIN+14, vc);
 
         row += (String)tim + ";";
         row += (String)(t/100) + "." + (String)(t%100) + ";";
