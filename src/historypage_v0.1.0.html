@@ -29,16 +29,16 @@ socket.onmessage = function(event) {
     
     for (let i=0; i<length; i++){
       //let t, tp, h, p, oc, c;
-      //include row time, 4 bytes in seconds
-      main.innerHTML += "\n" + data.readUIntBE(1+(i*16), 4) + ";";
+      //include row time, 8 bytes in esp time_t
+      main.innerHTML += "\n" + data.readUIntBE(1+(i*16), 8) + ";";
       //temperature, 2 bytes int in centi-celsius
-      main.innerHTML += (data.readIntBE(5+(i*16), 2)/100) + ";";
+      main.innerHTML += (data.readIntBE(9+(i*16), 2)/100) + ";";
       //humidity, 2 bytes int in deci-millis
-      main.innerHTML += (data.readUIntBE(7+(i*16), 2)/100) + ";";
+      main.innerHTML += (data.readUIntBE(11+(i*16), 2)/100) + ";";
       //pressure, 2 bytes int in Pa with a -500 hPa offset
-      main.innerHTML += (data.readUIntBE(9+(i*16), 2)/100+500) + ";";
+      main.innerHTML += (data.readUIntBE(13+(i*16), 2)/100+500) + ";";
       //TVOC, 2 bytes int in ppb
-      main.innerHTML += data.readUIntBE(11+(i*16), 2) + ";";
+      main.innerHTML += data.readUIntBE(15+(i*16), 2) + ";";
 
       }
     }
