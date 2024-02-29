@@ -8,7 +8,8 @@
 </main>
 <script>
 // Creates new WebSocket object with a wss URI as the parameter
-const socket = new WebSocket('wss://game.example.com/ws/updates');
+// const socket = new WebSocket('wss://game.example.com/ws/updates');
+const socket = new WebSocket('wss://192.168.4.1/history/s')
 
 // Fired when a connection with a WebSocket is opened
 socket.onopen = function () {
@@ -30,15 +31,15 @@ socket.onmessage = function(event) {
     for (let i=0; i<length; i++){
       //let t, tp, h, p, oc, c;
       //include row time, 8 bytes in esp time_t
-      main.innerHTML += "\n" + data.readUIntBE(1+(i*16), 8) + ";";
+      main.innerHTML += "\n" + event.data.readUIntBE(1+(i*16), 8) + ";";
       //temperature, 2 bytes int in centi-celsius
       main.innerHTML += (data.readIntBE(9+(i*16), 2)/100) + ";";
       //humidity, 2 bytes int in deci-millis
-      main.innerHTML += (data.readUIntBE(11+(i*16), 2)/100) + ";";
+      main.innerHTML += (event.data.readUIntBE(11+(i*16), 2)/100) + ";";
       //pressure, 2 bytes int in Pa with a -500 hPa offset
-      main.innerHTML += (data.readUIntBE(13+(i*16), 2)/100+500) + ";";
+      main.innerHTML += (event.data.readUIntBE(13+(i*16), 2)/100+500) + ";";
       //TVOC, 2 bytes int in ppb
-      main.innerHTML += data.readUIntBE(15+(i*16), 2) + ";";
+      main.innerHTML += event.data.readUIntBE(15+(i*16), 2) + ";";
 
       }
     }
