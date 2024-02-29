@@ -22,11 +22,25 @@ socket.onopen = function () {
 socket.onmessage = function(event) {
   handleUpdateData(event.data);
   ()=>{
+    let length = data.readUInt8(0);
+    //let buffer = new SharedArrayBuffer(16*length.to);
+    //let row0 = new ;
     //document.getElementById("data").innerHTML +=
     
-    let t, tp, h, p, oc, c;
-    main.innerHTML += 
-    
+    for (i in range(length){
+      //let t, tp, h, p, oc, c;
+      //include row time, 4 bytes in seconds
+      main.innerHTML += "\n" + data.readUIntBE(1, 4) + ";";
+      //temperature, 2 bytes int in centi-celsius
+      main.innerHTML += (data.readIntBE(5, 2)/100) + ";";
+      //humidity, 2 bytes int in deci-millis
+      main.innerHTML += (data.readUIntBE(7, 2)/100) + ";";
+      //pressure, 2 bytes int in Pa with a -500 hPa offset
+      main.innerHTML += (data.readUIntBE(9, 2)/100+500) + ";";
+      //TVOC, 2 bytes int in ppb
+      main.innerHTML += data.readUIntBE(1, 2) + ";";
+
+      }
     }
 };
 
