@@ -22,9 +22,11 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+#ifndef BME280_I2C_h
+#define BME280_I2C_h
 #include <Wire.h>
 #include <Arduino.h>
-#include "BME280_I2C.h"
+#endif
 
 class BME280_I2C{
     
