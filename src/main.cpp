@@ -776,12 +776,16 @@ function sdt(){
 
 
 void sendHistory(AsyncWebServerRequest *request){
-
+    static size_t maxLen = 256;
+    AsyncWebServerResponse *response = request->beginChunkedResponse("text/plain", [](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
       Serial.println();
       Serial.println("Sending all database to client:");
 
     static size_t dataLen = (step+1)*(DATASIZE*3+16);
+    static uint32_t rows_sent = 0;
 
+
+/*
     AsyncWebServerResponse *response = request->beginChunkedResponse("application/octet-stream", [](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
 
       String row = "\n";
@@ -792,50 +796,21 @@ void sendHistory(AsyncWebServerRequest *request){
         memcpy(buffer, &row, len);
         dataLen -= len;
         index += len;
-        
       }
-
-      
       return len;
       
     });
     response->setContentLength(dataLen);
     request->send(response);
 
-    //AsyncResponseStream *response = request->beginResponseStream("text/plain; charset=UTF-8");
-    
-    /*
-        AsyncWebServerResponse * AsyncWebServerRequest::beginChunkedResponse(const String& contentType, AwsResponseFiller callback, AwsTemplateProcessor templateCallback){
-        if(_version) return new AsyncChunkedResponse(contentType, callback, templateCallback);
-        return new AsyncCallbackResponse(contentType, 0, callback, templateCallback);}
-
-    //for (uint32_t i = 0; i < step; i++){
-    //response->print(String(d_time[i])+";"+String(d_temp[i], 2)+";"+String(d_hum[i], 2)+";"+String(d_pres[i], 2)+";"+String(d_tvoc[i])+"\n");  }
-    //request->send(response);
-*/
-
-      //  void AsyncWebServerRequest::sendChunked(const String& contentType, AwsResponseFiller callback, AwsTemplateProcessor templateCallback){
-      //  send(beginChunkedResponse(contentType, callback, templateCallback));}
-
-      /*
-      request->sendChunked( "text/plain", "Data history\n");
-      request->sendChunked( "text/plain", "device date: ");
-      request->sendChunked( "text/plain", (String)rtc.getTime("RTC0: %A, %B %d %Y %H:%M:%S"));
-      request->sendChunked( "text/plain", "\nepoch time: ");
-      request->sendChunked( "text/plain", rtc.getEpoch().to_chars());
-      request->sendChunked( "text/plain", "\n Data format is:\n Epoch time-seconds; temperature-°C; humidity-%; pressure-hPa; TVOC-ppb\n\n");
-      */
-
-
-
       //beginning the data rows
       for (uint32_t pas = 0; i < step; i++) {
         
           String row = "\n";
-          time_t tim0;
-          int16_t t0;
-          int16_t h0;
-          uint16_t p0;
+          time_t tim;
+          int16_t t;
+          int16_t h;
+          uint16_t p;
           uint16_t vc;
           //uint16_t co2;
 
@@ -857,6 +832,50 @@ void sendHistory(AsyncWebServerRequest *request){
 
       request->send_P(200, "text/html", "\nfinished");
 
+*/
+
+    //Write up to "maxLen" bytes into "buffer" and return the amount written.
+    //index equals the amount of bytes that have been already sent
+    //You will be asked for more data until 0 is returned
+    //Keep in mind that you can not delay or yield waiting for more data!
+
+    if (index = 0) {
+      memcpy(buffer, "First line\n", (size_t)12);
+      //for(int i=0; i<TOTALENTRIES; i++){}
+      return 1;
+    }
+    else {
+      //String row = String(regtime[i])+";"+String(regtemp[i], 2)+";"+String(reghum[i], 2)+";"+String(regpres[i], 2)+";"+String(regpol[i])+"\n";
+        static String row = "\n";
+        static time_t tim;
+        static int16_t t;
+        static int16_t h;
+        static uint16_t p;
+        static uint16_t vc;
+        //static uint16_t co2;
+
+        EEPROM.get(DATASIZE*rows_sent+EEPROMMARGIN, tim);
+        EEPROM.get(DATASIZE*rows_sent+EEPROMMARGIN+8, t);
+        EEPROM.get(DATASIZE*rows_sent+EEPROMMARGIN+10, h);
+        EEPROM.get(DATASIZE*rows_sent+EEPROMMARGIN+12, p);
+        EEPROM.get(DATASIZE*rows_sent+EEPROMMARGIN+14, vc);
+
+        row += (String)tim + ";";
+        row += (String)(t/100) + "." + (String)(t%100) + ";";
+        row += (String)(h/100) + "." + (String)(h%100) + ";";
+        row += (String)(p/100+500) + "." + (String)(p%100) + ";";
+        row += (String)tvoc + ";";
+
+      Serial.println(row);
+      memcpy (buffer, &row, row.length());
+      rows_sent ++;
+      if (rows_sent < step) return 1;
+    }
+    return 0;
+    //return mySource.read(buffer, maxLen);
+    });
+    response->addHeader("Server","SunnyBreeze History");
+    request->send(response);
 
 }
 
@@ -874,12 +893,7 @@ public:
     }
   });
 
-  server.on("/history", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send_P(200, "text/html", "<html>History goes here</html>");
-
-    Serial.println("history page loaded on client");
-    Serial.println();
-  });
+  server.on("/history", HTTP_GET, sendHistory);
 
   }
   virtual ~CaptiveRequestHandler() {}
@@ -926,10 +940,13 @@ void setupServer() {
     }
   });
 
+/*
   server.on("/history", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send_P(200, "text/html", "<html>History goes here</html>");
-  });
-  
+    Serial.println("history page loaded on client");
+    Serial.println();
+  });*/
+
   server.onNotFound([](AsyncWebServerRequest *request){request->send_P(200, "text/html", index_html, processor);});
 
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
