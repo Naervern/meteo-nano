@@ -1,32 +1,6 @@
-/*
-  BME280I2C.h library for both BME280 and BMP280 sensors in I2C mode.
 
-    Copyright (c) 2024, Antonio Maximiano - <naervern@protonmail.com>
-    
-    I did some work so this library could be used more easily, but the
-    bulk of information was originally found across helpful replies in
-     the Arduino Forum (specifically thread 553030) and Bosch's datasheet.
-
-
-    This library is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program.  If not, see <https://www.gnu.org/licenses/>.
-*/
-
-#ifndef BME280_I2C_h
-#define BME280_I2C_h
 #include <Wire.h>
 #include <Arduino.h>
-#endif
 
 class BME280_I2C{
     
@@ -70,7 +44,7 @@ class BME280_I2C{
     }
 
     void begin(){
-        Wire.begin();    
+        //Wire.begin();
         writeReg(0xF2,ctrl_hum_reg);
         writeReg(0xF4,ctrl_meas_reg);
         writeReg(0xF5,config_reg);
@@ -144,7 +118,6 @@ class BME280_I2C{
     }
     
     void readData(){
-        //Serial.println("readData() function called");
         int i = 0;
         uint32_t data[8];
         Wire.beginTransmission(ADDRESS);

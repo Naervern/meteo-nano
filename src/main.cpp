@@ -7,6 +7,7 @@
 #include "AsyncUDP.h"
 #include <AHT20.h>
 #include "SparkFun_ENS160.h"
+#include "BME280_I2C.h"
 #include <Wire.h>
 #include <EEPROM.h>
 
@@ -28,6 +29,7 @@ AsyncWebServer server(80);
 //AsyncWebServer historyserver(80);
 //AsyncEventSource events("/events");
 
+uint32_t rows_sent = 0;
 RTC_SLOW_ATTR unsigned long lastTime = 0;   
 const unsigned long timerDelay = 30000;
 
@@ -55,12 +57,21 @@ RTC_FAST_ATTR float histpressure[7] = {4040.2, 4040.2, 4040.2, 4040.2, 4040.2, 4
 RTC_FAST_ATTR uint16_t histtvoc[7] = {0};
 
   //these will all be used for the arrays
+  /*
+RTC_SLOW_ATTR time_t * d_time;
 RTC_SLOW_ATTR float * d_temp;
 RTC_SLOW_ATTR float * d_hum;
 RTC_SLOW_ATTR float * d_pres;
 RTC_SLOW_ATTR uint16_t * d_tvoc;
 RTC_SLOW_ATTR uint16_t * d_co2;
-RTC_SLOW_ATTR time_t * d_time;
+  */
+  //d_ arrays correspond to the daily measurements
+RTC_SLOW_ATTR time_t d_time[DAILYENTRIES] = {0};
+RTC_SLOW_ATTR float d_temp[DAILYENTRIES] = {0};
+RTC_SLOW_ATTR float d_hum[DAILYENTRIES] = {0};
+RTC_SLOW_ATTR float d_pres[DAILYENTRIES] = {0};
+RTC_SLOW_ATTR uint16_t d_tvoc[DAILYENTRIES] = {0};
+RTC_SLOW_ATTR uint16_t d_co2[DAILYENTRIES] = {0};
 
 RTC_SLOW_ATTR uint32_t step = 0; //iterator for the regtab array. It keeps track of what's the next measurement to be stored.
 
@@ -81,225 +92,6 @@ uint16_t tvoc;
 uint16_t co2;
 
 
-
-
-class BME280_I2C{
-    
-    public:
-
-    const uint8_t ADDRESS = 0x76; //default address is 0x76
-
-    BME280_I2C(){}
-
-    BME280_I2C(const uint8_t& x) : ADDRESS(x) {}
-
-    uint8_t osrs_t = 1;             //Temperature oversampling x 1
-    uint8_t osrs_p = 1;             //Pressure oversampling x 1
-    uint8_t osrs_h = 1;             //Humidity oversampling x 1
-    uint8_t mode = 3;               //Normal mode
-    uint8_t t_sb = 5;               //Tstandby 1000ms
-    uint8_t filter = 0;             //Filter off 
-    uint8_t spi3w_en = 0;           //3-wire SPI Disable
-    
-    unsigned long int hum_raw,temp_raw,pres_raw;
-    signed long int t_fine;
-    double temp_act = 0.0, press_act = 0.0,hum_act=0.0;
-    signed long int temp_cal;
-    unsigned long int press_cal,hum_cal;
-
-    float temperature {0};
-    float pressure {0};
-    float humidity {0};
-
-    void read(){
-        readData();
-          temp_cal = calibration_T(temp_raw);
-          temp_act = (double)temp_cal / 100.0;
-          press_cal = calibration_P(pres_raw);
-          press_act = (double)press_cal / 100.0;
-          hum_cal = calibration_H(hum_raw);
-          hum_act = (double)hum_cal / 1024.0;
-          temperature = (float)temp_act;
-          pressure = (float)press_act;
-          humidity = (float)hum_act;
-    }
-
-    void begin(){
-        //Wire.begin();
-        writeReg(0xF2,ctrl_hum_reg);
-        writeReg(0xF4,ctrl_meas_reg);
-        writeReg(0xF5,config_reg);
-        
-        //begin Trim
-        uint8_t i=0;
-        Wire.beginTransmission(ADDRESS);
-        Wire.write(0x88);
-        Wire.endTransmission();
-        Wire.requestFrom(ADDRESS,24);
-        while(Wire.available()){
-            data[i] = Wire.read();
-            i++;
-        }
-            
-        Wire.beginTransmission(ADDRESS);
-        Wire.write(0xA1);
-        Wire.endTransmission();
-        Wire.requestFrom(ADDRESS,1);
-        data[i] = Wire.read();
-        i++;
-        
-        Wire.beginTransmission(ADDRESS);
-        Wire.write(0xE1);
-        Wire.endTransmission();
-        Wire.requestFrom(ADDRESS,7);
-        while(Wire.available()){
-            data[i] = Wire.read();
-            i++;    
-        }
-        dig_T1 = (data[1] << 8) | data[0];
-        dig_T2 = (data[3] << 8) | data[2];
-        dig_T3 = (data[5] << 8) | data[4];
-        dig_P1 = (data[7] << 8) | data[6];
-        dig_P2 = (data[9] << 8) | data[8];
-        dig_P3 = (data[11]<< 8) | data[10];
-        dig_P4 = (data[13]<< 8) | data[12];
-        dig_P5 = (data[15]<< 8) | data[14];
-        dig_P6 = (data[17]<< 8) | data[16];
-        dig_P7 = (data[19]<< 8) | data[18];
-        dig_P8 = (data[21]<< 8) | data[20];
-        dig_P9 = (data[23]<< 8) | data[22];
-        dig_H1 = data[24];
-        dig_H2 = (data[26]<< 8) | data[25];
-        dig_H3 = data[27];
-        dig_H4 = (data[28]<< 4) | (0x0F & data[29]);
-        dig_H5 = (data[30]<< 4) | ((data[29] >> 4) & 0x0F);
-        dig_H6 = data[31];
-        
-    }
-
-    float getTemperature(){ //returns temperature in ºC
-        readData();
-        temp_cal = calibration_T(temp_raw);
-        temp_act = (double)temp_cal / 100.0;
-        return((float)temp_act);
-    }
-
-    float getPressure(){ //returns pressure in hPa
-        readData();
-        press_cal = calibration_P(pres_raw);
-        press_act = (double)press_cal / 100.0;
-        return((float)press_act);
-    }
-
-    float getHumidity(){ //returns relative atmospheric humidity in %
-        readData();
-        hum_cal = calibration_H(hum_raw);
-        hum_act = (double)hum_cal / 1024.0;
-        return((float)hum_act);
-    }
-    
-    void readData(){
-        int i = 0;
-        uint32_t data[8];
-        Wire.beginTransmission(ADDRESS);
-        Wire.write(0xF7);
-        Wire.endTransmission();
-        Wire.requestFrom(ADDRESS,8);
-        while(Wire.available()){
-            data[i] = Wire.read();
-            i++;
-        }
-        pres_raw = (data[0] << 12) | (data[1] << 4) | (data[2] >> 4);
-        temp_raw = (data[3] << 12) | (data[4] << 4) | (data[5] >> 4);
-        hum_raw  = (data[6] << 8) | data[7];
-    }
-
-    private:
-        uint8_t data[32];
-
-        uint8_t ctrl_meas_reg = (osrs_t << 5) | (osrs_p << 2) | mode;
-        uint8_t config_reg    = (t_sb << 5) | (filter << 2) | spi3w_en;
-        uint8_t ctrl_hum_reg  = osrs_h;
-
-        uint16_t dig_T1;
-        int16_t dig_T2;
-        int16_t dig_T3;
-        uint16_t dig_P1;
-        int16_t dig_P2;
-        int16_t dig_P3;
-        int16_t dig_P4;
-        int16_t dig_P5;
-        int16_t dig_P6;
-        int16_t dig_P7;
-        int16_t dig_P8;
-        int16_t dig_P9;
-        int8_t  dig_H1;
-        int16_t dig_H2;
-        int8_t  dig_H3;
-        int16_t dig_H4;
-        int16_t dig_H5;
-        int8_t  dig_H6;
-
-        void writeReg(uint8_t reg_address, uint8_t data){
-            Wire.beginTransmission(ADDRESS);
-            Wire.write(reg_address);
-            Wire.write(data);
-            Wire.endTransmission();    
-        }
-
-    signed long int calibration_T(signed long int adc_T)    {        
-        signed long int var1, var2, T;
-        var1 = ((((adc_T >> 3) - ((signed long int)dig_T1<<1))) * ((signed long int)dig_T2)) >> 11;
-        var2 = (((((adc_T >> 4) - ((signed long int)dig_T1)) * ((adc_T>>4) - ((signed long int)dig_T1))) >> 12) * ((signed long int)dig_T3)) >> 14;
-        
-        t_fine = var1 + var2;
-        T = (t_fine * 5 + 128) >> 8;
-        return T; 
-    }
-
-    unsigned long int calibration_P(signed long int adc_P)    {
-        signed long int var1, var2;
-        unsigned long int P;
-        var1 = (((signed long int)t_fine)>>1) - (signed long int)64000;
-        var2 = (((var1>>2) * (var1>>2)) >> 11) * ((signed long int)dig_P6);
-        var2 = var2 + ((var1*((signed long int)dig_P5))<<1);
-        var2 = (var2>>2)+(((signed long int)dig_P4)<<16);
-        var1 = (((dig_P3 * (((var1>>2)*(var1>>2)) >> 13)) >>3) + ((((signed long int)dig_P2) * var1)>>1))>>18;
-        var1 = ((((32768+var1))*((signed long int)dig_P1))>>15);
-        if (var1 == 0)
-        {
-            return 0;
-        }    
-        P = (((unsigned long int)(((signed long int)1048576)-adc_P)-(var2>>12)))*3125;
-        if(P<0x80000000)
-        {
-        P = (P << 1) / ((unsigned long int) var1);   
-        }
-        else
-        {
-            P = (P / (unsigned long int)var1) * 2;    
-        }
-        var1 = (((signed long int)dig_P9) * ((signed long int)(((P>>3) * (P>>3))>>13)))>>12;
-        var2 = (((signed long int)(P>>2)) * ((signed long int)dig_P8))>>13;
-        P = (unsigned long int)((signed long int)P + ((var1 + var2 + dig_P7) >> 4));
-        return P;
-    }
-
-    unsigned long int calibration_H(signed long int adc_H)    {
-        signed long int v_x1;        
-        v_x1 = (t_fine - ((signed long int)76800));
-        v_x1 = (((((adc_H << 14) -(((signed long int)dig_H4) << 20) - (((signed long int)dig_H5) * v_x1)) + 
-        ((signed long int)16384)) >> 15) * (((((((v_x1 * ((signed long int)dig_H6)) >> 10) * 
-        (((v_x1 * ((signed long int)dig_H3)) >> 11) + ((signed long int) 32768))) >> 10) + (( signed long int)2097152)) * 
-        ((signed long int) dig_H2) + 8192) >> 14));
-        v_x1 = (v_x1 - (((((v_x1 >> 15) * (v_x1 >> 15)) >> 7) * ((signed long int)dig_H1)) >> 4));
-        v_x1 = (v_x1 < 0 ? 0 : v_x1);
-        v_x1 = (v_x1 > 419430400 ? 419430400 : v_x1);
-        return (unsigned long int)(v_x1 >> 12);   
-    }
-};
-
-
 BME280_I2C bmp280;
 
 // LOW POWER FUNCTIONS HERE
@@ -314,6 +106,7 @@ RTC_FAST_ATTR uint32_t weektvoc;
 RTC_FAST_ATTR unsigned long weektime;
 */
 
+/*
 inline void rtc_alloc(){
   d_temp = (float *) malloc (DAILYENTRIES * sizeof (float));
   d_hum = (float *) malloc (DAILYENTRIES * sizeof (float));
@@ -322,6 +115,7 @@ inline void rtc_alloc(){
   d_co2 = (uint16_t *) malloc (DAILYENTRIES * sizeof (uint16_t));
   d_time = (time_t *) malloc (DAILYENTRIES * sizeof (time_t));
 }
+*/
 
 // END OF NEW LOW POWER FUNCTIONS
 
@@ -331,7 +125,7 @@ inline void rtc_alloc(){
 
 #define EEPROM_SIZE 3145728 //size of the flash memory to be reserved. 3145728 = 3MB
 
-void store_measurement(uint16_t step){
+void store_measurement(uint32_t step){
   byte byteARR[DATASIZE] = {0xFF};
 
   for (uint8_t i=0; i<DAILYENTRIES; i++){             //reserving the first 128 bytes of EEPROM for reasons
@@ -524,7 +318,7 @@ void update_params(){
 
   //save_entry(temperature, humidity, pressure, tvoc);
 
-  step++;     //increments the big counter
+  //step++;     //increments the big counter
   Serial.println("variable step value = ");  Serial.println(step); //debug
   day_step++; //increments the daily counter
   Serial.println("variable day_step value = ");  Serial.println(day_step); //debug
@@ -775,78 +569,62 @@ function sdt(){
 )rawliteral";
 
 
+void getHistory(String& str){
+
+    static char row[256];
+    static time_t tim;
+    static int16_t t;
+    static int16_t h;
+    static uint16_t p;
+    static uint16_t vc;
+
+    EEPROM.get(DATASIZE*rows_sent+EEPROMMARGIN, tim);
+    EEPROM.get(DATASIZE*rows_sent+EEPROMMARGIN+8, t);
+    EEPROM.get(DATASIZE*rows_sent+EEPROMMARGIN+10, h);
+    EEPROM.get(DATASIZE*rows_sent+EEPROMMARGIN+12, p);
+    EEPROM.get(DATASIZE*rows_sent+EEPROMMARGIN+14, vc);
+
+    snprintf(row, 256, "%llu;%i.%i;%i.%i;%u.%u;%u\n", tim, t/100, t%100, h/100, h%100, p/100+500, p%100, tvoc);
+    rows_sent++;
+}
+
+
 void sendHistory(AsyncWebServerRequest *request){
-    static size_t maxLen = 256;
+    //static size_t maxLen = 256;
     AsyncWebServerResponse *response = request->beginChunkedResponse("text/plain", [](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
-      Serial.println();
-      Serial.println("Sending all database to client:");
+      static byte currentIndexForChunk = 0;
 
     static size_t dataLen = (step+1)*(DATASIZE*3+16);
-    static uint32_t rows_sent = 0;
-
-
-/*
-    AsyncWebServerResponse *response = request->beginChunkedResponse("application/octet-stream", [](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
-
-      String row = "\n";
-      size_t len = (dataLen>maxLen)?maxLen:dataLen;
-
-      if (len>0)
-      {
-        memcpy(buffer, &row, len);
-        dataLen -= len;
-        index += len;
-      }
-      return len;
-      
-    });
-    response->setContentLength(dataLen);
-    request->send(response);
-
-      //beginning the data rows
-      for (uint32_t pas = 0; i < step; i++) {
-        
-          String row = "\n";
-          time_t tim;
-          int16_t t;
-          int16_t h;
-          uint16_t p;
-          uint16_t vc;
-          //uint16_t co2;
-
-          EEPROM.get(DATASIZE*pas+EEPROMMARGIN, tim);
-          EEPROM.get(DATASIZE*pas+EEPROMMARGIN+8, t);
-          EEPROM.get(DATASIZE*pas+EEPROMMARGIN+10, h);
-          EEPROM.get(DATASIZE*pas+EEPROMMARGIN+12, p);
-          EEPROM.get(DATASIZE*pas+EEPROMMARGIN+14, vc);
-
-        row += (String)tim + ";";
-        row += (String)(t/100) + "." + (String)(t%100) + ";";
-        row += (String)(h/100) + "." + (String)(h%100) + ";";
-        row += (String)(p/100+500) + "." + (String)(p%100) + ";";
-        row += (String)tvoc + ";";
-        request->sendChunked( "text/plain", row);
-
-        Serial.println(row);
-      }
-
-      request->send_P(200, "text/html", "\nfinished");
-
-*/
+    rows_sent = 0;
 
     //Write up to "maxLen" bytes into "buffer" and return the amount written.
     //index equals the amount of bytes that have been already sent
     //You will be asked for more data until 0 is returned
     //Keep in mind that you can not delay or yield waiting for more data!
 
-    if (index = 0) {
-      memcpy(buffer, "First line\n", (size_t)12);
-      //for(int i=0; i<TOTALENTRIES; i++){}
-      return 1;
+    if (index == 0) {
+      currentIndexForChunk = 0; 
+      strncat((char*)buffer, "First line\n", 12);
+      //for(int i=0; i<TOTALENTRIES; i++){} 
+      return strlen((char*) buffer);
+    } else buffer[0] = '\0';
+
+    if (currentIndexForChunk == step) { // we are done, send the footer
+      strncat((char*)buffer, "\nLast line", 11);
+      currentIndexForChunk++;
+      return strlen((char*) buffer);
+    } else if (currentIndexForChunk > step) { // the footer has been sent, we close this request by sending a length of 0
+      // but for the sake of the demo, we add something in the log to make it grow for next refresh
+      return 0;
     }
-    else {
+
+
+    size_t initialBufferLength = strlen((char*) buffer);
+
+ 
       //String row = String(regtime[i])+";"+String(regtemp[i], 2)+";"+String(reghum[i], 2)+";"+String(regpres[i], 2)+";"+String(regpol[i])+"\n";
-        static String row = "\n";
+        //static String row = "\n";
+        static char row[256];
         static time_t tim;
         static int16_t t;
         static int16_t h;
@@ -855,23 +633,30 @@ void sendHistory(AsyncWebServerRequest *request){
         //static uint16_t co2;
 
         EEPROM.get(DATASIZE*rows_sent+EEPROMMARGIN, tim);
+        Serial.println(tim);
         EEPROM.get(DATASIZE*rows_sent+EEPROMMARGIN+8, t);
+        Serial.println(t);
         EEPROM.get(DATASIZE*rows_sent+EEPROMMARGIN+10, h);
+        Serial.println(h);
         EEPROM.get(DATASIZE*rows_sent+EEPROMMARGIN+12, p);
+        Serial.println(p);
         EEPROM.get(DATASIZE*rows_sent+EEPROMMARGIN+14, vc);
-
+        Serial.println(vc);
+        
+        snprintf(row, 256, "%llu;%i.%i;%i.%i;%u.%u;%u\n", tim, t/100, t%100, h/100, h%100, (p/100)+500, p%100, vc);
+        strcpy((char*)buffer, row);
+        //memcpy (buffer, &row, row.length());
+/*
         row += (String)tim + ";";
         row += (String)(t/100) + "." + (String)(t%100) + ";";
         row += (String)(h/100) + "." + (String)(h%100) + ";";
         row += (String)(p/100+500) + "." + (String)(p%100) + ";";
         row += (String)tvoc + ";";
-
+*/
       Serial.println(row);
-      memcpy (buffer, &row, row.length());
       rows_sent ++;
-      if (rows_sent < step) return 1;
-    }
-    return 0;
+      currentIndexForChunk++;
+      return strlen((char*) buffer);
     //return mySource.read(buffer, maxLen);
     });
     response->addHeader("Server","SunnyBreeze History");
@@ -893,9 +678,28 @@ public:
     }
   });
 
-  server.on("/history", HTTP_GET, sendHistory);
+  server.on("/forcestore", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send_P(200, "text/plain", "last measurement stored to EEPROM");
+    Serial.println("Client called the forecestore function. The values to be stored as time, temp, hum, pres and tvoc are:");
 
+    EEPROM.put(DATASIZE*(step+1)+EEPROMMARGIN, rtc.getEpoch());   //first variable, 8 bytes (time_t) - UNIX time
+    Serial.println(rtc.getEpoch());
+    EEPROM.put(DATASIZE*(step+1)+EEPROMMARGIN+8, (int16_t)(temperature*100));   //second variable, 2 bytes (int16_t) - temperature in degC with 0.01 degree
+    Serial.println((int16_t)temperature*100);
+    EEPROM.put(DATASIZE*(step+1)+EEPROMMARGIN+10, (int16_t)(humidity*100));    //second variable, 2 bytes (int16_t) - humidity in %
+    Serial.println((int16_t)humidity*100);
+    EEPROM.put(DATASIZE*(step+1)+EEPROMMARGIN+12, (int16_t)((pressure-500)*100));   //second variable, 2 bytes (int16_t) - pressure in hPa
+    Serial.println((int16_t)(pressure-500)*100);
+    EEPROM.put(DATASIZE*(step+1)+EEPROMMARGIN+14, (int16_t)tvoc);
+    Serial.println((int16_t)tvoc);
+
+    step++;
+
+  });
+
+  server.on("/history", HTTP_GET, sendHistory);
   }
+
   virtual ~CaptiveRequestHandler() {}
 
 
@@ -939,13 +743,6 @@ void setupServer() {
       Serial.printf("Time received: %lu \n", acquiredTime);
     }
   });
-
-/*
-  server.on("/history", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send_P(200, "text/html", "<html>History goes here</html>");
-    Serial.println("history page loaded on client");
-    Serial.println();
-  });*/
 
   server.onNotFound([](AsyncWebServerRequest *request){request->send_P(200, "text/html", index_html, processor);});
 
