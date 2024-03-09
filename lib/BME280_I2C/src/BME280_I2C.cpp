@@ -25,10 +25,9 @@
 #include "BME280_I2C.h"
 
 
-    BME280_I2C::BME280_I2C(const uint8_t& x){
-        BME280_I2C : *new BME280_I2C;
-        ADDRESS = x;
-    };
+    BME280_I2C::BME280_I2C(const uint8_t& x) : ADDRESS(x) {}
+
+    BME280_I2C::~BME280_I2C(){}
 
     uint8_t osrs_t = 1;             //Temperature oversampling x 1
     uint8_t osrs_p = 1;             //Pressure oversampling x 1

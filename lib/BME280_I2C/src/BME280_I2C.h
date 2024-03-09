@@ -32,11 +32,11 @@ class BME280_I2C
 {
     public:
 
-        static uint8_t ADDRESS = 0x76; //default address is 0x76
 
-        BME280_I2C(const uint8_t& x);
-        BME280_I2C();
+        BME280_I2C(const uint8_t& ADDRESS=0x76);//default address is 0x76
         ~BME280_I2C();
+
+        const uint8_t ADDRESS;
 
         uint8_t osrs_t;             //Temperature oversampling x 1
         uint8_t osrs_p;             //Pressure oversampling x 1
