@@ -22,12 +22,13 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-#include <Wire.h>
-#include <Arduino.h>
 #include "BME280_I2C.h"
 
 
-    BME280_I2C::BME280_I2C();
+    BME280_I2C::BME280_I2C(const uint8_t& x){
+        BME280_I2C : *new BME280_I2C;
+        ADDRESS = x;
+    };
 
     uint8_t osrs_t = 1;             //Temperature oversampling x 1
     uint8_t osrs_p = 1;             //Pressure oversampling x 1
@@ -60,7 +61,7 @@
           humidity = (float)hum_act;
     }
 
-    void BME280_I2C::begin(){
+    bool BME280_I2C::begin(){
         Wire.begin();    
         writeReg(0xF2,ctrl_hum_reg);
         writeReg(0xF4,ctrl_meas_reg);
@@ -111,6 +112,7 @@
         dig_H5 = (data[30]<< 4) | ((data[29] >> 4) & 0x0F);
         dig_H6 = data[31];
         
+        return true;
     }
 
     float BME280_I2C::getTemperature(){ //returns temperature in ºC
