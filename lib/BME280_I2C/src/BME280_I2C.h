@@ -32,23 +32,25 @@ class BME280_I2C
 {
     public:
 
+        static uint8_t ADDRESS = 0x76; //default address is 0x76
 
-        BME280_I2C(const uint8_t& x) : ADDRESS(x){};
+        BME280_I2C(const uint8_t& x);
+        BME280_I2C();
         ~BME280_I2C();
 
-        const uint8_t ADDRESS = 0x76; //default address is 0x76
-
-        uint8_t osrs_t = 1;             //Temperature oversampling x 1
-        uint8_t osrs_p = 1;             //Pressure oversampling x 1
-        uint8_t osrs_h = 1;             //Humidity oversampling x 1
-        uint8_t mode = 3;               //Normal mode
-        uint8_t t_sb = 5;               //Tstandby 1000ms
-        uint8_t filter = 0;             //Filter off 
-        uint8_t spi3w_en = 0;           //3-wire SPI Disable
+        uint8_t osrs_t;             //Temperature oversampling x 1
+        uint8_t osrs_p;             //Pressure oversampling x 1
+        uint8_t osrs_h;             //Humidity oversampling x 1
+        uint8_t mode;               //Normal mode
+        uint8_t t_sb;               //Tstandby 1000ms
+        uint8_t filter;             //Filter off 
+        uint8_t spi3w_en;           //3-wire SPI Disable
 
         unsigned long int hum_raw,temp_raw,pres_raw;
         signed long int t_fine;
-        double temp_act = 0.0, press_act = 0.0,hum_act=0.0;
+        double temp_act;
+        double press_act;
+        double hum_act;
         signed long int temp_cal;
         unsigned long int press_cal,hum_cal;
 
@@ -56,7 +58,7 @@ class BME280_I2C
         float pressure {0};
         float humidity {0};
 
-        void begin();               // Initialises the sensor in the I2C bus
+        bool begin();               // Initialises the sensor in the I2C bus
 
         float getTemperature();     // returns temperature in ºC
 
