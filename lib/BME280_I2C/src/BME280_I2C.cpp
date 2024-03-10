@@ -43,10 +43,6 @@
     signed long int temp_cal;
     unsigned long int press_cal,hum_cal;
 
-    float temperature {0};
-    float pressure {0};
-    float humidity {0};
-
     void BME280_I2C::read(){
         readData();
           temp_cal = calibration_T(temp_raw);
