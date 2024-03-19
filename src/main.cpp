@@ -10,12 +10,12 @@
 #include "BME280_I2C.h"
 #include "htmls.h"
 #include <Wire.h>
-#include <EEPROM.h>
+#include "EEPROM.h"
 
 #define TIMERDELAY 30    // Delay between measurements in seconds
 #define TOTALENTRIES 57600  // Total entries to be stored in the EEPROM
 #define DAILYENTRIES 144    // How many measurements expected to be done during a day. If every 24h/10min = 144
-#define EEPROMMARGIN 128    // Bytes reserved in the beginning of the EEPROM, before the storage space of the measurements
+#define EEPROMMARGIN 128    // Bytes reserved in the beginning of the EEPROM, before the EEPROM space of the measurements
 #define DATASIZE 16         // The sum of all enabled stored data types. 8 bytes time_t, plus 3 * int16_t and one uint_16 = 16 bytes
 
 #define AHT21_ADDRESS 0x38
@@ -26,6 +26,7 @@
 
 DNSServer dnsServer;
 AsyncWebServer server(80);
+EEPROMClass STORAGE("storage");
 
 uint32_t rows_sent = 0;
 RTC_SLOW_ATTR unsigned long lastTime = 0;   
@@ -128,12 +129,12 @@ void store_measurement(uint32_t step){
 
   for (uint8_t i=0; i<DAILYENTRIES; i++){             //reserving the first 128 bytes of EEPROM for reasons
     //DATASIZE*( step - DAILYENTRIES + i + 1 ) + EEPROMMARGIN -> for the start. This is called for the first time when the value of variable step is DAILYENTRIES.
-    EEPROM.put(DATASIZE*(step+i-DAILYENTRIES+1)+EEPROMMARGIN, d_time[i]);   //first variable, 8 bytes (time_t) - UNIX time
-    EEPROM.put(DATASIZE*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+8, d_temp[i]);   //second variable, 2 bytes (int16_t) - temperature in degC with 0.01 degree
-    EEPROM.put(DATASIZE*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+10, d_hum[i]);    //second variable, 2 bytes (int16_t) - humidity in %
-    EEPROM.put(DATASIZE*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+12, d_pres[i]);   //second variable, 2 bytes (int16_t) - pressure in hPa
-    EEPROM.put(DATASIZE*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+14, d_tvoc[i]);    //second variable, 2 bytes (uint16_t) - TVOC in ppb
-    //EEPROM.put(DATASIZE*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+16, d_co2[i]);    //second variable, 2 bytes (uint16_t) - eCO2 in ppm --- disabled in this example
+    STORAGE.put(DATASIZE*(step+i-DAILYENTRIES+1)+EEPROMMARGIN, d_time[i]);   //first variable, 8 bytes (time_t) - UNIX time
+    STORAGE.put(DATASIZE*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+8, d_temp[i]);   //second variable, 2 bytes (int16_t) - temperature in degC with 0.01 degree
+    STORAGE.put(DATASIZE*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+10, d_hum[i]);    //second variable, 2 bytes (int16_t) - humidity in %
+    STORAGE.put(DATASIZE*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+12, d_pres[i]);   //second variable, 2 bytes (int16_t) - pressure in hPa
+    STORAGE.put(DATASIZE*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+14, d_tvoc[i]);    //second variable, 2 bytes (uint16_t) - TVOC in ppb
+    //STORAGE.put(DATASIZE*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+16, d_co2[i]);    //second variable, 2 bytes (uint16_t) - eCO2 in ppm --- disabled in this example
   };
 }
 
@@ -150,12 +151,12 @@ class readEntry {
     int16_t p;
   
   void get_measurement (uint32_t pas){
-    EEPROM.get(DATASIZE*pas+EEPROMMARGIN, tim); //reserving the first 128 bytes of EEPROM for reasons
-    EEPROM.get(DATASIZE*pas+EEPROMMARGIN+8, t);
-    EEPROM.get(DATASIZE*pas+EEPROMMARGIN+10, h);
-    EEPROM.get(DATASIZE*pas+EEPROMMARGIN+12, p);
-    EEPROM.get(DATASIZE*pas+EEPROMMARGIN+14, tvoc);
-    //EEPROM.get(DATASIZE*pas+EEPROMMARGIN+16, co2);
+    STORAGE.get(DATASIZE*pas+EEPROMMARGIN, tim); //reserving the first 128 bytes of EEPROM for reasons
+    STORAGE.get(DATASIZE*pas+EEPROMMARGIN+8, t);
+    STORAGE.get(DATASIZE*pas+EEPROMMARGIN+10, h);
+    STORAGE.get(DATASIZE*pas+EEPROMMARGIN+12, p);
+    STORAGE.get(DATASIZE*pas+EEPROMMARGIN+14, tvoc);
+    //STORAGE.get(DATASIZE*pas+EEPROMMARGIN+16, co2);
   }
 };
 
@@ -165,7 +166,7 @@ RTC_FAST_ATTR uint32_t counter = 0, value = 0;
 void get_stored_data_length(){
   counter = 0, value = 0;
     while(true) {
-        EEPROM.get(18*counter + EEPROMMARGIN, value);
+        STORAGE.get(18*counter + EEPROMMARGIN, value);
         Serial.printf("Checked the block");
         Serial.println(counter);
         if (value != 0xffffffff) {break;}
@@ -366,11 +367,11 @@ void getHistory(String& str){
     static uint16_t p;
     static uint16_t vc;
 
-    EEPROM.get(DATASIZE*rows_sent+EEPROMMARGIN, tim);
-    EEPROM.get(DATASIZE*rows_sent+EEPROMMARGIN+8, t);
-    EEPROM.get(DATASIZE*rows_sent+EEPROMMARGIN+10, h);
-    EEPROM.get(DATASIZE*rows_sent+EEPROMMARGIN+12, p);
-    EEPROM.get(DATASIZE*rows_sent+EEPROMMARGIN+14, vc);
+    STORAGE.get(DATASIZE*rows_sent+EEPROMMARGIN, tim);
+    STORAGE.get(DATASIZE*rows_sent+EEPROMMARGIN+8, t);
+    STORAGE.get(DATASIZE*rows_sent+EEPROMMARGIN+10, h);
+    STORAGE.get(DATASIZE*rows_sent+EEPROMMARGIN+12, p);
+    STORAGE.get(DATASIZE*rows_sent+EEPROMMARGIN+14, vc);
 
     snprintf(row, 256, "%llu;%i.%i;%i.%i;%u.%u;%u\n", tim, t/100, t%100, h/100, h%100, p/100+500, p%100, tvoc);
     rows_sent++;
@@ -420,15 +421,15 @@ void sendHistory(AsyncWebServerRequest *request){
         static uint16_t vc;
         //static uint16_t co2;
 
-        EEPROM.get(DATASIZE*rows_sent+EEPROMMARGIN, tim);
+        STORAGE.get(DATASIZE*rows_sent+EEPROMMARGIN, tim);
         Serial.println(tim);
-        EEPROM.get(DATASIZE*rows_sent+EEPROMMARGIN+8, t);
+        STORAGE.get(DATASIZE*rows_sent+EEPROMMARGIN+8, t);
         Serial.println(t);
-        EEPROM.get(DATASIZE*rows_sent+EEPROMMARGIN+10, h);
+        STORAGE.get(DATASIZE*rows_sent+EEPROMMARGIN+10, h);
         Serial.println(h);
-        EEPROM.get(DATASIZE*rows_sent+EEPROMMARGIN+12, p);
+        STORAGE.get(DATASIZE*rows_sent+EEPROMMARGIN+12, p);
         Serial.println(p);
-        EEPROM.get(DATASIZE*rows_sent+EEPROMMARGIN+14, vc);
+        STORAGE.get(DATASIZE*rows_sent+EEPROMMARGIN+14, vc);
         Serial.println(vc);
         
         snprintf(row, 256, "%llu;%i.%i;%i.%i;%u.%u;%u\n", tim, t/100, t%100, h/100, h%100, (p/100)+500, p%100, vc);
@@ -467,18 +468,18 @@ public:
   });
 
   server.on("/forcestore", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send_P(200, "text/plain", "last measurement stored to EEPROM");
+    request->send_P(200, "text/plain", "last measurement stored to STORAGE");
     Serial.println("Client called the forecestore function. The values to be stored as time, temp, hum, pres and tvoc are:");
 
-    EEPROM.put(DATASIZE*(step+1)+EEPROMMARGIN, rtc.getEpoch());   //first variable, 8 bytes (time_t) - UNIX time
+    STORAGE.put(DATASIZE*(step+1)+EEPROMMARGIN, rtc.getEpoch());   //first variable, 8 bytes (time_t) - UNIX time
     Serial.println(rtc.getEpoch());
-    EEPROM.put(DATASIZE*(step+1)+EEPROMMARGIN+8, (int16_t)(temperature*100));   //second variable, 2 bytes (int16_t) - temperature in degC with 0.01 degree
+    STORAGE.put(DATASIZE*(step+1)+EEPROMMARGIN+8, (int16_t)(temperature*100));   //second variable, 2 bytes (int16_t) - temperature in degC with 0.01 degree
     Serial.println((int16_t)temperature*100);
-    EEPROM.put(DATASIZE*(step+1)+EEPROMMARGIN+10, (int16_t)(humidity*100));    //second variable, 2 bytes (int16_t) - humidity in %
+    STORAGE.put(DATASIZE*(step+1)+EEPROMMARGIN+10, (int16_t)(humidity*100));    //second variable, 2 bytes (int16_t) - humidity in %
     Serial.println((int16_t)humidity*100);
-    EEPROM.put(DATASIZE*(step+1)+EEPROMMARGIN+12, (int16_t)((pressure-500)*100));   //second variable, 2 bytes (int16_t) - pressure in hPa
+    STORAGE.put(DATASIZE*(step+1)+EEPROMMARGIN+12, (int16_t)((pressure-500)*100));   //second variable, 2 bytes (int16_t) - pressure in hPa
     Serial.println((int16_t)(pressure-500)*100);
-    EEPROM.put(DATASIZE*(step+1)+EEPROMMARGIN+14, (int16_t)tvoc);
+    STORAGE.put(DATASIZE*(step+1)+EEPROMMARGIN+14, (int16_t)tvoc);
     Serial.println((int16_t)tvoc);
 
     step++;
@@ -541,7 +542,7 @@ void setupServer() {
 
 void setup() {
   setCpuFrequencyMhz(240);
-  EEPROM.begin(EEPROM_SIZE);
+  STORAGE.begin(EEPROM_SIZE);
   Serial.begin(115200);
   Wire.begin();
 
@@ -561,9 +562,9 @@ void setup() {
     Serial.println("PSRAM not available");
   }
 
-  Serial.println("Beginning EEPROM discovery");
-  get_stored_data_length(); //discovers how many rows were saved in the EEPROM already, then continues from the first empty space.
-  Serial.printf("A total of %u entries have been discovered in the EEPROM\n", step);
+  Serial.println("Beginning Flash Storage discovery");
+  get_stored_data_length(); //discovers how many rows were saved in the STORAGE already, then continues from the first empty space.
+  Serial.printf("A total of %u entries have been discovered in the Flash Storage\n", step);
   Serial.println();
 
   setCpuFrequencyMhz(80);
