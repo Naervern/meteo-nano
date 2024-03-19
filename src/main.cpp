@@ -441,7 +441,7 @@ class BME280_I2C{
 
 DNSServer dnsServer;
 AsyncWebServer server(80);
-EEPROMClass STORAGE("storage");
+EEPROMClass STORAGE("eeprom0");
 
 uint32_t rows_sent = 0;
 RTC_SLOW_ATTR unsigned long lastTime = 0;   
@@ -888,11 +888,16 @@ public:
 
     STORAGE.put(DATASIZE*(step+1)+EEPROMMARGIN, rtc.getEpoch());   //first variable, 8 bytes (time_t) - UNIX time
     Serial.println(rtc.getEpoch());
-    STORAGE.put(DATASIZE*(step+1)+EEPROMMARGIN+8, (int16_t)(temperature*100));   //second variable, 2 bytes (int16_t) - temperature in degC with 0.01 degree
+    float tempy, hummy, pressy;
+    tempy = temperature*100;
+    hummy = humidity*100;
+    pressy = (pressure-500)*100;
+
+    STORAGE.put(DATASIZE*(step+1)+EEPROMMARGIN+8, (int16_t)tempy);   //second variable, 2 bytes (int16_t) - temperature in degC with 0.01 degree
     Serial.println((int16_t)temperature*100);
-    STORAGE.put(DATASIZE*(step+1)+EEPROMMARGIN+10, (int16_t)(humidity*100));    //second variable, 2 bytes (int16_t) - humidity in %
+    STORAGE.put(DATASIZE*(step+1)+EEPROMMARGIN+10, (int16_t)hummy);    //second variable, 2 bytes (int16_t) - humidity in %
     Serial.println((int16_t)humidity*100);
-    STORAGE.put(DATASIZE*(step+1)+EEPROMMARGIN+12, (int16_t)((pressure-500)*100));   //second variable, 2 bytes (int16_t) - pressure in hPa
+    STORAGE.put(DATASIZE*(step+1)+EEPROMMARGIN+12, (int16_t)pressy);   //second variable, 2 bytes (int16_t) - pressure in hPa
     Serial.println((int16_t)(pressure-500)*100);
     STORAGE.put(DATASIZE*(step+1)+EEPROMMARGIN+14, (int16_t)tvoc);
     Serial.println((int16_t)tvoc);
