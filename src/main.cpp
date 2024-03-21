@@ -7,11 +7,13 @@
 #include "AsyncUDP.h"
 #include <AHT20.h>
 #include "SparkFun_ENS160.h"
-//#include "BME280_I2C.h"
-//#include "htmls.h"
+#include "BME280_I2C.h"
+#include "htmls.h"
 #include <Wire.h>
+#include "SPIFFS.h"
 
 #define TIMERDELAY 30    // Delay between measurements in seconds
+#define TOTALENTRIES 115200  // Delay between measurements in seconds
 #define DAILYENTRIES 144    // How many measurements expected to be done during a day. If every 24h/10min = 144
 #define EEPROMMARGIN 128    // Bytes reserved in the beginning of the EEPROM, before the EEPROM space of the measurements
 #define DATASIZE 16         // The sum of all enabled stored data types. 8 bytes time_t, plus 3 * int16_t and one uint_16 = 16 bytes
@@ -82,7 +84,7 @@ RTC_SLOW_ATTR uint16_t d_co2[DAILYENTRIES];
 
 RTC_SLOW_ATTR uint8_t storingbuffer[BUFFERSIZE];
 
-static RTC_SLOW_ATTR uint32_t step = 0; //iterator for the regtab array. It keeps track of what's the next measurement to be stored.
+static RTC_SLOW_ATTR uint16_t day_count = 0; //counts days logged in the system
 
 bool static measurement_trigger = false;
 bool static midnight_trigger = false;
@@ -99,7 +101,6 @@ float humidity;
 float pressure;
 uint16_t tvoc;
 uint16_t co2;
-
 
 BME280_I2C bmp280;
 
@@ -134,20 +135,6 @@ void update_time(){
   //if(nWday < oldWday) nWday += 7;
   //organise_week(nWday-oldWday); //calls the function to 
 
-}
-
-
-void save_entry(float val0, float val1, float val2, uint16_t val3){
-
-  // This function saves entries to the next 
-
-  regtemp[step] = val0;
-  reghum[step] = val1;
-  regpres[step] = val2;
-  regtvoc[step] = val3;
-  regtime[step] = millis();
-  step++;
-  if(step > TOTALENTRIES){step = 0;};
 }
 
 
@@ -222,8 +209,6 @@ void update_params(){
 
   //save_entry(temperature, humidity, pressure, tvoc);
 
-  step++;     //increments the big counter
-  Serial.println("variable step value = ");  Serial.println(step); //debug
   day_step++; //increments the daily counter
   Serial.println("variable day_step value = ");  Serial.println(day_step); //debug
   if (day_step >= DAILYENTRIES) {
@@ -290,12 +275,6 @@ void getHistory(String& str){
     static uint16_t p;
     static uint16_t vc;
 
-    STORAGE.get(DATASIZE*rows_sent+EEPROMMARGIN, tim);
-    STORAGE.get(DATASIZE*rows_sent+EEPROMMARGIN+8, t);
-    STORAGE.get(DATASIZE*rows_sent+EEPROMMARGIN+10, h);
-    STORAGE.get(DATASIZE*rows_sent+EEPROMMARGIN+12, p);
-    STORAGE.get(DATASIZE*rows_sent+EEPROMMARGIN+14, vc);
-
     snprintf(row, 256, "%llu;%i.%i;%i.%i;%u.%u;%u\n", tim, t/100, t%100, h/100, h%100, p/100+500, p%100, tvoc);
     rows_sent++;
 }
@@ -306,7 +285,7 @@ void sendHistory(AsyncWebServerRequest *request){
     AsyncWebServerResponse *response = request->beginChunkedResponse("text/plain", [](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
       static byte currentIndexForChunk = 0;
 
-    static size_t dataLen = (step+1)*(DATASIZE*3+16);
+    static size_t dataLen = (day_count*day_step+1)*(DATASIZE*3+16);
     rows_sent = 0;
 
     //Write up to "maxLen" bytes into "buffer" and return the amount written.
@@ -315,18 +294,18 @@ void sendHistory(AsyncWebServerRequest *request){
     //Keep in mind that you can not delay or yield waiting for more data!
 
     if (index == 0) {
-      buffer="";
+      //buffer='\0';
       currentIndexForChunk = 0; 
       strncat((char*)buffer, "First line\n", 12);
       //for(int i=0; i<TOTALENTRIES; i++){} 
       return strlen((char*) buffer);
     } else buffer[0] = '\0';
 
-    if (currentIndexForChunk == step) { // we are done, send the footer
+    if (currentIndexForChunk == day_step) { // we are done, send the footer
       strncat((char*)buffer, "\nLast line", 11);
       currentIndexForChunk++;
       return strlen((char*) buffer);
-    } else if (currentIndexForChunk > step) { // the footer has been sent, we close this request by sending a length of 0
+    } else if (currentIndexForChunk > day_step) { // the footer has been sent, we close this request by sending a length of 0
       // but for the sake of the demo, we add something in the log to make it grow for next refresh
       return 0;
     }
@@ -345,16 +324,10 @@ void sendHistory(AsyncWebServerRequest *request){
         static uint16_t vc;
         //static uint16_t co2;
 
-        STORAGE.get(DATASIZE*rows_sent+EEPROMMARGIN, tim);
-        Serial.println(tim);
-        STORAGE.get(DATASIZE*rows_sent+EEPROMMARGIN+8, t);
-        Serial.println(t);
-        STORAGE.get(DATASIZE*rows_sent+EEPROMMARGIN+10, h);
-        Serial.println(h);
-        STORAGE.get(DATASIZE*rows_sent+EEPROMMARGIN+12, p);
-        Serial.println(p);
-        STORAGE.get(DATASIZE*rows_sent+EEPROMMARGIN+14, vc);
-        Serial.println(vc);
+/////////////////////////////////////
+//////////////////////////////////////
+////////////////////////////////////////
+
         
         snprintf(row, 256, "%llu;%i.%i;%i.%i;%u.%u;%u\n", tim, t/100, t%100, h/100, h%100, (p/100)+500, p%100, vc);
         strcpy((char*)buffer, row);
@@ -395,23 +368,7 @@ public:
     request->send_P(200, "text/plain", "last measurement stored to STORAGE");
     Serial.println("Client called the forecestore function. The values to be stored as time, temp, hum, pres and tvoc are:");
 
-    STORAGE.put(DATASIZE*(step+1)+EEPROMMARGIN, rtc.getEpoch());   //first variable, 8 bytes (time_t) - UNIX time
-    Serial.println(rtc.getEpoch());
-    float tempy, hummy, pressy;
-    tempy = temperature*100;
-    hummy = humidity*100;
-    pressy = (pressure-500)*100;
-
-    STORAGE.put(DATASIZE*(step+1)+EEPROMMARGIN+8, (int16_t)tempy);   //second variable, 2 bytes (int16_t) - temperature in degC with 0.01 degree
-    Serial.println((int16_t)temperature*100);
-    STORAGE.put(DATASIZE*(step+1)+EEPROMMARGIN+10, (int16_t)hummy);    //second variable, 2 bytes (int16_t) - humidity in %
-    Serial.println((int16_t)humidity*100);
-    STORAGE.put(DATASIZE*(step+1)+EEPROMMARGIN+12, (int16_t)pressy);   //second variable, 2 bytes (int16_t) - pressure in hPa
-    Serial.println((int16_t)(pressure-500)*100);
-    STORAGE.put(DATASIZE*(step+1)+EEPROMMARGIN+14, (int16_t)tvoc);
-    Serial.println((int16_t)tvoc);
-
-    step++;
+    //storeData();
 
   });
 
@@ -456,37 +413,67 @@ void mode_normal(){
 
 /////////////////////////////
 
-void storeData(){
+uint16_t count_files() //this function returns how many entries have been saved in the SPIFFS
+{
+  static uint16_t count = 0;
+  File root = SPIFFS.open("/data/");
+  File file = root.openNextFile();
+  while(file) count++ ;
+  return count;
+}
 
-static byte* buffer;
 
-uint8_t * buffer = (uint8_t *)malloc(BUFFERSIZE);
-
+bool storeData(){
+//static uint8_t* buffer = (uint8_t *)malloc(BUFFERSIZE);
 /*
   float tempy, hummy, pressy;
   tempy = temperature*100;
   hummy = humidity*100;
   pressy = (pressure-500)*100;
 */
-
   for(uint16_t counter = 0; counter < day_step; counter++){
     static uint16_t storingSeconds = (rtc.getSecond()/2) + (rtc.getMinute()*30) + (rtc.getHour(true)*1800); //storing the time of measurement in seconds of the day, divided by 2
-    storingbuffer[counter*DATASIZE] = storingSeconds;
-    storingbuffer[counter*DATASIZE+1] = storingSeconds >> 8;
-    storingbuffer[counter*DATASIZE+2] = (uint16_t)(temperature*100);
-    storingbuffer[counter*DATASIZE+3] = (uint16_t)(temperature*100) >> 8;
-    storingbuffer[counter*DATASIZE+4] = (uint16_t)(humidity*100);
-    storingbuffer[counter*DATASIZE+5] = (uint16_t)(humidity*100) >> 8;
-    storingbuffer[counter*DATASIZE+6] = (uint16_t)((pressure-500)*100);
-    storingbuffer[counter*DATASIZE+7] = (uint16_t)((pressure-500)*100) >> 8;
-    storingbuffer[counter*DATASIZE+8] = (uint16_t)(tvoc);
-    storingbuffer[counter*DATASIZE+9] = (uint16_t)(tvoc) >> 8;
-    //storingbuffer[counter*DATASIZE+10] = (uint16_t)(co2);
-    //storingbuffer[counter*DATASIZE+11] = (uint16_t)(co2) >> 8;
-    
+    storingbuffer[counter*DATASIZE] = storingSeconds >> 8;
+    storingbuffer[counter*DATASIZE+1] = storingSeconds;
+    storingbuffer[counter*DATASIZE+2] = (uint16_t)(temperature*100) >> 8;
+    storingbuffer[counter*DATASIZE+3] = (uint16_t)(temperature*100);
+    storingbuffer[counter*DATASIZE+4] = (uint16_t)(humidity*100) >> 8;
+    storingbuffer[counter*DATASIZE+5] = (uint16_t)(humidity*100);
+    storingbuffer[counter*DATASIZE+6] = (uint16_t)((pressure-500)*100) >> 8;
+    storingbuffer[counter*DATASIZE+7] = (uint16_t)((pressure-500)*100);
+    storingbuffer[counter*DATASIZE+8] = (uint16_t)(tvoc) >> 8;
+    storingbuffer[counter*DATASIZE+9] = (uint16_t)(tvoc);
+    //storingbuffer[counter*DATASIZE+10] = (uint16_t)(co2) >> 8;
+    //storingbuffer[counter*DATASIZE+11] = (uint16_t)(co2);
   }
-
+  return true;
 }
+
+void storeTime(){
+  static uint64_t timeToStore = rtc.getEpoch();
+  storingbuffer[DAILYENTRIES*DATASIZE] = timeToStore >> 56;
+  storingbuffer[DAILYENTRIES*DATASIZE+1] = timeToStore >> 48;
+  storingbuffer[DAILYENTRIES*DATASIZE+2] = timeToStore >> 40;
+  storingbuffer[DAILYENTRIES*DATASIZE+3] = timeToStore >> 32;
+  storingbuffer[DAILYENTRIES*DATASIZE+4] = timeToStore >> 24;
+  storingbuffer[DAILYENTRIES*DATASIZE+5] = timeToStore >> 16;
+  storingbuffer[DAILYENTRIES*DATASIZE+6] = timeToStore >> 8;
+  storingbuffer[DAILYENTRIES*DATASIZE+7] = timeToStore;
+}
+
+bool commitData(){
+  File file = SPIFFS.open("/data/"+(String)day_count, "w");
+  
+  if(!file) return false;
+
+  file.write(storingbuffer, sizeof(storingbuffer));
+
+  for(uint8_t i : storingbuffer) i=0;
+
+  return true;
+}
+
+
 
 ////////////////////////////
 
@@ -528,8 +515,14 @@ void setup() {
   }
 
   Serial.println("Beginning Flash Storage discovery");
-  //get_stored_data_length(); //discovers how many rows were saved in the STORAGE already, then continues from the first empty space.
-  Serial.printf("A total of %u entries have been discovered in the Flash Storage\n", step);
+
+  if (!SPIFFS.begin(true)) {
+    Serial.println("An Error has occurred while mounting SPIFFS");
+    delay(0xFFFFFFFF);
+  }
+
+  day_count = count_files();
+  Serial.printf("A total of %u entries have been discovered in the Flash Storage\n", day_count);
   Serial.println();
 
   setCpuFrequencyMhz(160);
@@ -545,7 +538,7 @@ void setup() {
   ens160.setOperatingMode(0x02);
 
   update_params();
-  step--; day_step--;
+  day_step--;
 
 
   WiFi.mode(WIFI_AP);
