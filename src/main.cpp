@@ -10,13 +10,14 @@
 //#include "BME280_I2C.h"
 //#include "htmls.h"
 #include <Wire.h>
-#include "LITTLEFS.h"
 
 #define TIMERDELAY 30    // Delay between measurements in seconds
-#define TOTALENTRIES 57600  // Total entries to be stored in the EEPROM
 #define DAILYENTRIES 144    // How many measurements expected to be done during a day. If every 24h/10min = 144
 #define EEPROMMARGIN 128    // Bytes reserved in the beginning of the EEPROM, before the EEPROM space of the measurements
 #define DATASIZE 16         // The sum of all enabled stored data types. 8 bytes time_t, plus 3 * int16_t and one uint_16 = 16 bytes
+#define BUFFERSIZE 1536   //Size of the flash storing buffer in Bytes; Consider the amount of measurements per day and data size for this;
+
+#define SPIFFS_SIZE 3145728 //size of the flash memory to be reserved. 3145728 = 3MB
 
 #define AHT21_ADDRESS 0x38
 #define ENS160_ADDRESS 0x53
@@ -72,12 +73,14 @@ RTC_SLOW_ATTR uint16_t * d_tvoc;
 RTC_SLOW_ATTR uint16_t * d_co2;
   */
   //d_ arrays correspond to the daily measurements
-RTC_SLOW_ATTR time_t d_time[DAILYENTRIES] = {0};
-RTC_SLOW_ATTR float d_temp[DAILYENTRIES] = {0};
-RTC_SLOW_ATTR float d_hum[DAILYENTRIES] = {0};
-RTC_SLOW_ATTR float d_pres[DAILYENTRIES] = {0};
-RTC_SLOW_ATTR uint16_t d_tvoc[DAILYENTRIES] = {0};
-RTC_SLOW_ATTR uint16_t d_co2[DAILYENTRIES] = {0};
+RTC_SLOW_ATTR time_t d_time[DAILYENTRIES];
+RTC_SLOW_ATTR float d_temp[DAILYENTRIES];
+RTC_SLOW_ATTR float d_hum[DAILYENTRIES];
+RTC_SLOW_ATTR float d_pres[DAILYENTRIES];
+RTC_SLOW_ATTR uint16_t d_tvoc[DAILYENTRIES];
+RTC_SLOW_ATTR uint16_t d_co2[DAILYENTRIES];
+
+RTC_SLOW_ATTR uint8_t storingbuffer[BUFFERSIZE];
 
 static RTC_SLOW_ATTR uint32_t step = 0; //iterator for the regtab array. It keeps track of what's the next measurement to be stored.
 
@@ -104,25 +107,6 @@ BME280_I2C bmp280;
 
 // END OF NEW LOW POWER FUNCTIONS
 
-
-
-//EEPROM FUNCTIONS
-
-#define EEPROM_SIZE 3145728 //size of the flash memory to be reserved. 3145728 = 3MB
-
-void store_measurement(uint32_t step){
-  byte byteARR[DATASIZE] = {0xFF};
-
-  for (uint8_t i=0; i<DAILYENTRIES; i++){             //reserving the first 128 bytes of EEPROM for reasons
-    //DATASIZE*( step - DAILYENTRIES + i + 1 ) + EEPROMMARGIN -> for the start. This is called for the first time when the value of variable step is DAILYENTRIES.
-    STORAGE.put(DATASIZE*(step+i-DAILYENTRIES+1)+EEPROMMARGIN, d_time[i]);   //first variable, 8 bytes (time_t) - UNIX time
-    STORAGE.put(DATASIZE*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+8, d_temp[i]);   //second variable, 2 bytes (int16_t) - temperature in degC with 0.01 degree
-    STORAGE.put(DATASIZE*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+10, d_hum[i]);    //second variable, 2 bytes (int16_t) - humidity in %
-    STORAGE.put(DATASIZE*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+12, d_pres[i]);   //second variable, 2 bytes (int16_t) - pressure in hPa
-    STORAGE.put(DATASIZE*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+14, d_tvoc[i]);    //second variable, 2 bytes (uint16_t) - TVOC in ppb
-    //STORAGE.put(DATASIZE*(step+i-DAILYENTRIES+1)+EEPROMMARGIN+16, d_co2[i]);    //second variable, 2 bytes (uint16_t) - eCO2 in ppm --- disabled in this example
-  };
-}
 
 RTC_SLOW_ATTR time_t now = time(nullptr);
 
@@ -467,6 +451,50 @@ void mode_normal(){
 */
 
 
+
+
+
+/////////////////////////////
+
+void storeData(){
+
+static byte* buffer;
+
+uint8_t * buffer = (uint8_t *)malloc(BUFFERSIZE);
+
+/*
+  float tempy, hummy, pressy;
+  tempy = temperature*100;
+  hummy = humidity*100;
+  pressy = (pressure-500)*100;
+*/
+
+  for(uint16_t counter = 0; counter < day_step; counter++){
+    static uint16_t storingSeconds = (rtc.getSecond()/2) + (rtc.getMinute()*30) + (rtc.getHour(true)*1800); //storing the time of measurement in seconds of the day, divided by 2
+    storingbuffer[counter*DATASIZE] = storingSeconds;
+    storingbuffer[counter*DATASIZE+1] = storingSeconds >> 8;
+    storingbuffer[counter*DATASIZE+2] = (uint16_t)(temperature*100);
+    storingbuffer[counter*DATASIZE+3] = (uint16_t)(temperature*100) >> 8;
+    storingbuffer[counter*DATASIZE+4] = (uint16_t)(humidity*100);
+    storingbuffer[counter*DATASIZE+5] = (uint16_t)(humidity*100) >> 8;
+    storingbuffer[counter*DATASIZE+6] = (uint16_t)((pressure-500)*100);
+    storingbuffer[counter*DATASIZE+7] = (uint16_t)((pressure-500)*100) >> 8;
+    storingbuffer[counter*DATASIZE+8] = (uint16_t)(tvoc);
+    storingbuffer[counter*DATASIZE+9] = (uint16_t)(tvoc) >> 8;
+    //storingbuffer[counter*DATASIZE+10] = (uint16_t)(co2);
+    //storingbuffer[counter*DATASIZE+11] = (uint16_t)(co2) >> 8;
+    
+  }
+
+}
+
+////////////////////////////
+
+
+
+
+
+
 void setupServer() {
   
   server.on("/time", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -487,7 +515,6 @@ void setupServer() {
 
 void setup() {
   setCpuFrequencyMhz(240);
-  STORAGE.begin(EEPROM_SIZE);
   Serial.begin(115200);
   Wire.begin();
 
