@@ -451,7 +451,7 @@
                 ]
             },
             "defines": [
-                "PLATFORMIO=60113",
+                "PLATFORMIO=60114",
                 "ARDUINO_LOLIN_S2_MINI",
                 "BOARD_HAS_PSRAM",
                 "ARDUINO_USB_CDC_ON_BOOT=1",

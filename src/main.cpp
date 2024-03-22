@@ -251,6 +251,8 @@ String processor(const String& var){
   return String();
 }
 
+
+
 void getHistory(String& str){
 
     static char row[256];
@@ -263,137 +265,6 @@ void getHistory(String& str){
     snprintf(row, 256, "%llu;%i.%i;%i.%i;%u.%u;%u\n", tim, t/100, t%100, h/100, h%100, p/100+500, p%100, tvoc);
     rows_sent++;
 }
-
-
-void sendHistory(AsyncWebServerRequest *request){
-    //static size_t maxLen = 256;
-    AsyncWebServerResponse *response = request->beginChunkedResponse("text/plain", [](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
-      static byte currentIndexForChunk = 0;
-
-    static size_t dataLen = (day_count*day_step+1)*(DATASIZE*3+16);
-    rows_sent = 0;
-
-    //Write up to "maxLen" bytes into "buffer" and return the amount written.
-    //index equals the amount of bytes that have been already sent
-    //You will be asked for more data until 0 is returned
-    //Keep in mind that you can not delay or yield waiting for more data!
-
-    if (index == 0) {
-      //buffer='\0';
-      currentIndexForChunk = 0; 
-      strncat((char*)buffer, "First line\n", 12);
-      //for(int i=0; i<TOTALENTRIES; i++){} 
-      return strlen((char*) buffer);
-    } else buffer[0] = '\0';
-
-    if (currentIndexForChunk == day_step) { // we are done, send the footer
-      strncat((char*)buffer, "\nLast line", 11);
-      currentIndexForChunk++;
-      return strlen((char*) buffer);
-    } else if (currentIndexForChunk > day_step) { // the footer has been sent, we close this request by sending a length of 0
-      // but for the sake of the demo, we add something in the log to make it grow for next refresh
-      return 0;
-    }
-
-
-    size_t initialBufferLength = strlen((char*) buffer);
-
- 
-      //String row = String(regtime[i])+";"+String(regtemp[i], 2)+";"+String(reghum[i], 2)+";"+String(regpres[i], 2)+";"+String(regpol[i])+"\n";
-        //static String row = "\n";
-        static char row[256];
-        static time_t tim;
-        static int16_t t;
-        static uint16_t h;
-        static uint16_t p;
-        static uint16_t vc;
-        //static uint16_t co2;
-
-/////////////////////////////////////
-//////////////////////////////////////
-////////////////////////////////////////
-
-        
-        snprintf(row, 256, "%llu;%i.%i;%i.%i;%u.%u;%u\n", tim, t/100, t%100, h/100, h%100, (p/100)+500, p%100, vc);
-        strcpy((char*)buffer, row);
-        //memcpy (buffer, &row, row.length());
-/*
-        row += (String)tim + ";";
-        row += (String)(t/100) + "." + (String)(t%100) + ";";
-        row += (String)(h/100) + "." + (String)(h%100) + ";";
-        row += (String)(p/100+500) + "." + (String)(p%100) + ";";
-        row += (String)tvoc + ";";
-*/
-      Serial.println(row);
-      rows_sent ++;
-      currentIndexForChunk++;
-      return strlen((char*) buffer);
-    //return mySource.read(buffer, maxLen);
-    });
-    response->addHeader("Server","SunnyBreeze History");
-    request->send(response);
-
-}
-
-class CaptiveRequestHandler : public AsyncWebHandler {
-public:
-  CaptiveRequestHandler() {
-
-  server.on("/time", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send_P(200, "text/html", settime_html);
-    if (request->hasParam("settime")) {
-      acquiredTime = request->getParam("settime")->value().toInt();
-      update_time();
-      Serial.printf("Time received: %lu \n", acquiredTime);
-      Serial.println();
-    }
-  });
-
-  server.on("/forcestore", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send_P(200, "text/plain", "last measurement stored to STORAGE");
-    Serial.println("Client called the forecestore function. The values to be stored as time, temp, hum, pres and tvoc are:");
-
-    //storeData();
-
-  });
-
-  server.on("/history", HTTP_GET, sendHistory);
-  }
-
-  virtual ~CaptiveRequestHandler() {}
-
-
-  bool canHandle(AsyncWebServerRequest *request) {
-    //request->addInterestingHeader("ANY");
-    return true;
-  }
-
-  void handleRequest(AsyncWebServerRequest *request) {
-    request->send_P(200, "text/html", index_html, processor);
-  };
-};
-
-
-inline void disableWiFi() __attribute__((always_inline));
-inline void disableWiFi(){
-    WiFi.disconnect(true);  // Disconnect from the network
-    WiFi.mode(WIFI_OFF);    // Switch WiFi off
-}
-
-
-/*
-inline void mode_normal() __attribute__((always_inline));
-void mode_normal(){
-  ens160.setOperatingMode(0x00);
-  //schedule_time();
-  ens160.setOperatingMode(0x02);
-  dnsServer.processNextRequest();
-  //events.send(String(pressure).c_str(),"pressure",millis());
-}
-*/
-
-
-
 
 
 /////////////////////////////
@@ -479,29 +350,11 @@ uint16_t readData(uint16_t i){
   return 0;
 }
 
-void parseData(uint16_t i){
+void parseData(uint16_t i, char* ex_string){
 
-  static char row[64];
+  char row[64];
 
   float tempy, hummy, pressy;
-  tempy = temperature*100;
-  hummy = humidity*100;
-  pressy = (pressure-500)*100;
-
-
-  static uint16_t storingSeconds = (rtc.getSecond()/2) + (rtc.getMinute()*30) + (rtc.getHour(true)*1800); //storing the time of measurement in seconds of the day, divided by 2
-  readingBuffer[i*DATASIZE] = storingSeconds >> 8;
-  readingBuffer[i*DATASIZE+1] = storingSeconds;
-  readingBuffer[i*DATASIZE+2] = (int16_t)(temperature*100) >> 8;
-  readingBuffer[i*DATASIZE+3] = (int16_t)(temperature*100);
-  readingBuffer[i*DATASIZE+4] = (uint16_t)(humidity*100) >> 8;
-  readingBuffer[i*DATASIZE+5] = (uint16_t)(humidity*100);
-  readingBuffer[i*DATASIZE+6] = (uint16_t)((pressure-500)*100) >> 8;
-  readingBuffer[i*DATASIZE+7] = (uint16_t)((pressure-500)*100);
-  readingBuffer[i*DATASIZE+8] = (uint16_t)(tvoc) >> 8;
-  readingBuffer[i*DATASIZE+9] = (uint16_t)(tvoc);
-  //storingbuffer[i*DATASIZE+10] = (uint16_t)(co2) >> 8;
-  //storingbuffer[i*DATASIZE+11] = (uint16_t)(co2);
 
   static uint16_t sr;
   static int16_t tr;
@@ -510,11 +363,144 @@ void parseData(uint16_t i){
   static uint16_t vcr;
   //static uint16_t co2r;
 
+  sr = readingBuffer[i*DATASIZE] << 8 | readingBuffer[i*DATASIZE+1];
+  tr = readingBuffer[i*DATASIZE+2] << 8 | readingBuffer[i*DATASIZE+3];
+  hr = readingBuffer[i*DATASIZE+4] << 8 | readingBuffer[i*DATASIZE+5];
+  pr = readingBuffer[i*DATASIZE+6] << 8 | readingBuffer[i*DATASIZE+7];
+  vcr = readingBuffer[i*DATASIZE+8] << 8 | readingBuffer[i*DATASIZE+9];
+  //co2r = readingBuffer[i*DATASIZE+10] << 8 | readingBuffer[i*DATASIZE+11];
+
   snprintf(row, 64, "%llu;%f;%f;%f;%u\n", sr*2, (float)tr/100, (float)hr/100, (float)pr/100+500, vcr);
+
+  for(int i=0; i < 64; i++) ex_string[i] = row[i];
 
 }
 
 ////////////////////////////
+
+
+
+
+void sendHistory(AsyncWebServerRequest *request){
+    //static size_t maxLen = 256;
+    AsyncWebServerResponse *response = request->beginChunkedResponse("text/plain", [](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
+      static byte currentIndexForChunk = 0;
+
+    static size_t dataLen = (day_count*day_step+1)*(64);
+    rows_sent = 0;
+
+    //Write up to "maxLen" bytes into "buffer" and return the amount written.
+    //index equals the amount of bytes that have been already sent
+    //You will be asked for more data until 0 is returned
+    //Keep in mind that you can not delay or yield waiting for more data!
+
+    if (index == 0) {
+      //buffer='\0';
+      currentIndexForChunk = 0; 
+      strncat((char*)buffer, "First line\n", 12);
+      //for(int i=0; i<TOTALENTRIES; i++){} 
+      return strlen((char*) buffer);
+    } else buffer[0] = '\0';
+
+    if (currentIndexForChunk == day_step) { // we are done, send the footer
+      strncat((char*)buffer, "\nLast line", 11);
+      currentIndexForChunk++;
+      return strlen((char*) buffer);
+    } else if (currentIndexForChunk > day_step) { // the footer has been sent, we close this request by sending a length of 0
+      // but for the sake of the demo, we add something in the log to make it grow for next refresh
+      return 0;
+    }
+
+
+    size_t initialBufferLength = strlen((char*) buffer);
+
+ 
+      //String row = String(regtime[i])+";"+String(regtemp[i], 2)+";"+String(reghum[i], 2)+";"+String(regpres[i], 2)+";"+String(regpol[i])+"\n";
+        //static String row = "\n";
+        static char row[64];
+        static time_t tim;
+        static int16_t t;
+        static uint16_t h;
+        static uint16_t p;
+        static uint16_t vc;
+        //static uint16_t co2;
+
+/////////////////////////////////////
+//////////////////////////////////////
+////////////////////////////////////////
+
+        strcpy((char*)buffer, row);
+        //memcpy (buffer, &row, row.length());
+
+      Serial.println(row);
+      rows_sent++;
+      currentIndexForChunk++;
+      return strlen((char*) buffer);
+    //return mySource.read(buffer, maxLen);
+
+    });
+    response->addHeader("Server","SunnyBreeze History");
+    request->send(response);
+
+}
+
+class CaptiveRequestHandler : public AsyncWebHandler {
+public:
+  CaptiveRequestHandler() {
+
+  server.on("/time", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send_P(200, "text/html", settime_html);
+    if (request->hasParam("settime")) {
+      acquiredTime = request->getParam("settime")->value().toInt();
+      update_time();
+      Serial.printf("Time received: %lu \n", acquiredTime);
+      Serial.println();
+    }
+  });
+
+  server.on("/forcestore", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send_P(200, "text/plain", "last measurement stored to STORAGE");
+    Serial.println("Client called the forecestore function. The values to be stored as time, temp, hum, pres and tvoc are:");
+
+    //storeData();
+
+  });
+
+  server.on("/history", HTTP_GET, sendHistory);
+  }
+
+  virtual ~CaptiveRequestHandler() {}
+
+
+  bool canHandle(AsyncWebServerRequest *request) {
+    //request->addInterestingHeader("ANY");
+    return true;
+  }
+
+  void handleRequest(AsyncWebServerRequest *request) {
+    request->send_P(200, "text/html", index_html, processor);
+  };
+};
+
+
+inline void disableWiFi() __attribute__((always_inline));
+inline void disableWiFi(){
+    WiFi.disconnect(true);  // Disconnect from the network
+    WiFi.mode(WIFI_OFF);    // Switch WiFi off
+}
+
+
+/*
+inline void mode_normal() __attribute__((always_inline));
+void mode_normal(){
+  ens160.setOperatingMode(0x00);
+  //schedule_time();
+  ens160.setOperatingMode(0x02);
+  dnsServer.processNextRequest();
+  //events.send(String(pressure).c_str(),"pressure",millis());
+}
+*/
+
 
 
 
