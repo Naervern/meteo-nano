@@ -12,12 +12,13 @@
 #include <Wire.h>
 #include "SPIFFS.h"
 
-#define TIMERDELAY 30    // Delay between measurements in seconds
-#define TOTALENTRIES 115200  // Delay between measurements in seconds
+#define TIMERDELAY 30       // Delay between measurements in seconds
+#define TOTALENTRIES 115200 // Delay between measurements in seconds
 #define DAILYENTRIES 144    // How many measurements expected to be done during a day. If every 24h/10min = 144
 #define EEPROMMARGIN 128    // Bytes reserved in the beginning of the EEPROM, before the EEPROM space of the measurements
-#define DATASIZE 16         // The sum of all enabled stored data types. 8 bytes time_t, plus 3 * int16_t and one uint_16 = 16 bytes
-#define BUFFERSIZE 1536   //Size of the flash storing buffer in Bytes; Consider the amount of measurements per day and data size for this;
+#define DATASIZE 10         // The sum of stored data types in a storage row. 2 bytes from second-pair in day, plus one int16_t and three uint_16 = 10 bytes
+#define BUFFERSIZE 1448     // Size of the flash storing buffer in Bytes; Consider the amount of measurements per day and data size for this and add 8 for a daily rtc.getEpoch() time recording;
+#define FILESIZE 1536       // File size in bytes, to be used. Consider keeping it a multiple of 256 and calculate a minimum of DAILYENTRIES * DATASIZE
 
 #define SPIFFS_SIZE 3145728 //size of the flash memory to be reserved. 3145728 = 3MB
 
@@ -49,8 +50,9 @@ RTC_SLOW_ATTR time_t * regtime;
 
 //RTC_SLOW_ATTR struct tm * timeinfo;
 //RTC_SLOW_ATTR struct timeval tv;
-RTC_SLOW_ATTR static unsigned long acquiredTime = 0;
-RTC_SLOW_ATTR static unsigned long previousTime = 0;
+RTC_SLOW_ATTR uint32_t acquiredTime = 0;
+RTC_SLOW_ATTR uint32_t previousTime = 0;
+RTC_SLOW_ATTR uint16_t bootcount;
 
 RTC_SLOW_ATTR static short day_step = 0; // iterates over the day. Shouldn't be so important, but it's here just in case
 RTC_SLOW_ATTR static uint8_t week_it = 0;    // this might be useless to track... but can also speed up the server access
@@ -65,30 +67,23 @@ RTC_FAST_ATTR uint16_t histtvoc[7] = {0};
 
 RTC_FAST_ATTR uint8_t d_data[DAILYENTRIES*DATASIZE];
 
-  //these will all be used for the arrays
-  /*
-RTC_SLOW_ATTR time_t * d_time;
-RTC_SLOW_ATTR float * d_temp;
-RTC_SLOW_ATTR float * d_hum;
-RTC_SLOW_ATTR float * d_pres;
-RTC_SLOW_ATTR uint16_t * d_tvoc;
-RTC_SLOW_ATTR uint16_t * d_co2;
-  */
   //d_ arrays correspond to the daily measurements
-RTC_SLOW_ATTR time_t d_time[DAILYENTRIES];
-RTC_SLOW_ATTR float d_temp[DAILYENTRIES];
-RTC_SLOW_ATTR float d_hum[DAILYENTRIES];
-RTC_SLOW_ATTR float d_pres[DAILYENTRIES];
+RTC_SLOW_ATTR uint16_t d_time[DAILYENTRIES];
+RTC_SLOW_ATTR int16_t d_temp[DAILYENTRIES];
+RTC_SLOW_ATTR uint16_t d_hum[DAILYENTRIES];
+RTC_SLOW_ATTR uint16_t d_pres[DAILYENTRIES];
 RTC_SLOW_ATTR uint16_t d_tvoc[DAILYENTRIES];
 RTC_SLOW_ATTR uint16_t d_co2[DAILYENTRIES];
 
 RTC_SLOW_ATTR uint8_t storingbuffer[BUFFERSIZE];
 
-static RTC_SLOW_ATTR uint16_t day_count = 0; //counts days logged in the system
+RTC_SLOW_ATTR uint16_t day_count = 0; //counts days logged in the system
 
-bool static measurement_trigger = false;
-bool static midnight_trigger = false;
-bool static   wifi_on = false;
+bool measurement_trigger = false;
+bool midnight_trigger = false;
+bool wifi_on = false;
+
+uint8_t readingBuffer[BUFFERSIZE];
 
 AHT20 aht20;
 
@@ -108,7 +103,6 @@ BME280_I2C bmp280;
 
 // END OF NEW LOW POWER FUNCTIONS
 
-
 RTC_SLOW_ATTR time_t now = time(nullptr);
 
 void update_time(){
@@ -125,15 +119,6 @@ void update_time(){
   week_it = rtc.getDayofWeek();
   Serial.printf("weekday: %u ", week_it);
 	Serial.println();
-
-  //Serial.println(acquiredTime);
-  //uint8_t nWday = (&now/86400L + 4) % 7;
-  //  if(!getLocalTime(&timeinfo)) {Serial.println("Failed to obtain time"); weekday = 0;}
-  //  else{}
-  //previousTime = tv.tv_tsec;  
-  //tv.tv_sec = acquiredTime;
-  //if(nWday < oldWday) nWday += 7;
-  //organise_week(nWday-oldWday); //calls the function to 
 
 }
 
@@ -319,7 +304,7 @@ void sendHistory(AsyncWebServerRequest *request){
         static char row[256];
         static time_t tim;
         static int16_t t;
-        static int16_t h;
+        static uint16_t h;
         static uint16_t p;
         static uint16_t vc;
         //static uint16_t co2;
@@ -431,20 +416,20 @@ bool storeData(){
   hummy = humidity*100;
   pressy = (pressure-500)*100;
 */
-  for(uint16_t counter = 0; counter < day_step; counter++){
+  for(uint16_t i = 0; i < day_step; i++){
     static uint16_t storingSeconds = (rtc.getSecond()/2) + (rtc.getMinute()*30) + (rtc.getHour(true)*1800); //storing the time of measurement in seconds of the day, divided by 2
-    storingbuffer[counter*DATASIZE] = storingSeconds >> 8;
-    storingbuffer[counter*DATASIZE+1] = storingSeconds;
-    storingbuffer[counter*DATASIZE+2] = (uint16_t)(temperature*100) >> 8;
-    storingbuffer[counter*DATASIZE+3] = (uint16_t)(temperature*100);
-    storingbuffer[counter*DATASIZE+4] = (uint16_t)(humidity*100) >> 8;
-    storingbuffer[counter*DATASIZE+5] = (uint16_t)(humidity*100);
-    storingbuffer[counter*DATASIZE+6] = (uint16_t)((pressure-500)*100) >> 8;
-    storingbuffer[counter*DATASIZE+7] = (uint16_t)((pressure-500)*100);
-    storingbuffer[counter*DATASIZE+8] = (uint16_t)(tvoc) >> 8;
-    storingbuffer[counter*DATASIZE+9] = (uint16_t)(tvoc);
-    //storingbuffer[counter*DATASIZE+10] = (uint16_t)(co2) >> 8;
-    //storingbuffer[counter*DATASIZE+11] = (uint16_t)(co2);
+    storingbuffer[i*DATASIZE] = storingSeconds >> 8;
+    storingbuffer[i*DATASIZE+1] = storingSeconds;
+    storingbuffer[i*DATASIZE+2] = (int16_t)(temperature*100) >> 8;
+    storingbuffer[i*DATASIZE+3] = (int16_t)(temperature*100);
+    storingbuffer[i*DATASIZE+4] = (uint16_t)(humidity*100) >> 8;
+    storingbuffer[i*DATASIZE+5] = (uint16_t)(humidity*100);
+    storingbuffer[i*DATASIZE+6] = (uint16_t)((pressure-500)*100) >> 8;
+    storingbuffer[i*DATASIZE+7] = (uint16_t)((pressure-500)*100);
+    storingbuffer[i*DATASIZE+8] = (uint16_t)(tvoc) >> 8;
+    storingbuffer[i*DATASIZE+9] = (uint16_t)(tvoc);
+    //storingbuffer[i*DATASIZE+10] = (uint16_t)(co2) >> 8;
+    //storingbuffer[i*DATASIZE+11] = (uint16_t)(co2);
   }
   return true;
 }
@@ -463,17 +448,71 @@ void storeTime(){
 
 bool commitData(){
   File file = SPIFFS.open("/data/"+(String)day_count, "w");
-  
-  if(!file) return false;
+
+    if(!file) return false;
 
   file.write(storingbuffer, sizeof(storingbuffer));
-
   for(uint8_t i : storingbuffer) i=0;
-
+  file.close();
   return true;
 }
 
+uint16_t readData(uint16_t i){
+  File file = SPIFFS.open("/data/"+(String)i, "r");
+  size_t len = 0;
 
+  if(file && !file.isDirectory()){
+    len = file.size();
+    size_t flen = len;
+    Serial.print("- reading" );
+    while(len){
+        size_t toRead = len;
+        if(toRead > 512){
+            toRead = 512;
+        }
+        file.read(readingBuffer, toRead);
+        len -= toRead;
+    }
+  }
+  file.close();
+
+  return 0;
+}
+
+void parseData(uint16_t i){
+
+  static char row[64];
+
+  float tempy, hummy, pressy;
+  tempy = temperature*100;
+  hummy = humidity*100;
+  pressy = (pressure-500)*100;
+
+
+  static uint16_t storingSeconds = (rtc.getSecond()/2) + (rtc.getMinute()*30) + (rtc.getHour(true)*1800); //storing the time of measurement in seconds of the day, divided by 2
+  readingBuffer[i*DATASIZE] = storingSeconds >> 8;
+  readingBuffer[i*DATASIZE+1] = storingSeconds;
+  readingBuffer[i*DATASIZE+2] = (int16_t)(temperature*100) >> 8;
+  readingBuffer[i*DATASIZE+3] = (int16_t)(temperature*100);
+  readingBuffer[i*DATASIZE+4] = (uint16_t)(humidity*100) >> 8;
+  readingBuffer[i*DATASIZE+5] = (uint16_t)(humidity*100);
+  readingBuffer[i*DATASIZE+6] = (uint16_t)((pressure-500)*100) >> 8;
+  readingBuffer[i*DATASIZE+7] = (uint16_t)((pressure-500)*100);
+  readingBuffer[i*DATASIZE+8] = (uint16_t)(tvoc) >> 8;
+  readingBuffer[i*DATASIZE+9] = (uint16_t)(tvoc);
+  //storingbuffer[i*DATASIZE+10] = (uint16_t)(co2) >> 8;
+  //storingbuffer[i*DATASIZE+11] = (uint16_t)(co2);
+
+  static uint16_t sr;
+  static int16_t tr;
+  static uint16_t hr;
+  static uint16_t pr;
+  static uint16_t vcr;
+  //static uint16_t co2r;
+
+  snprintf(row, 64, "%llu;%f;%f;%f;%u\n", sr*2, (float)tr/100, (float)hr/100, (float)pr/100+500, vcr);
+
+}
 
 ////////////////////////////
 
