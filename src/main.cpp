@@ -573,10 +573,9 @@ void setup() {
 
   setenv("TZ", "EET-2EEST,M3.5.0/3,M10.5.0/4", 1); // Timezone set to Helsinki
 
-  bmp280.begin();
-  if (aht20.begin() == false){Serial.println("AHT20 not detected. Please check wiring.");} else {Serial.println("AHT20 acknowledged.");}
-  ens160.begin();
-  if( !ens160.begin() ){Serial.println("Could not communicate with the ENS160, check wiring.");}
+  if ( !bmp280.begin() ) Serial.println("BMP280 not detected. Please check wiring."); else Serial.println("BMP280 check OK!.");
+  if ( !aht20.begin() ) Serial.println("AHT20 not detected. Please check wiring."); else Serial.println("AHT20 check OK!.");
+  if ( !ens160.begin() ) Serial.println("Could not communicate with the ENS160, check wiring."); else Serial.println("ENS160 check OK!");
   ens160.setOperatingMode(SFE_ENS160_RESET);
   ens160.setOperatingMode(SFE_ENS160_STANDARD);
   ens160.setOperatingMode(0x02);
