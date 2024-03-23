@@ -180,15 +180,15 @@ void update_params(){
 
   Serial.println("New measurement");
   Serial.printf("Temperature = %.2f °C", temperature);
-    Serial.println();
+    Serial.println("\r");
   Serial.printf("Humidity = %.2f %%", humidity);
-    Serial.println();
+    Serial.println("\r");
   Serial.printf("Pressure = %.2f hPa", pressure);
-    Serial.println();
+    Serial.println("\r");
   Serial.printf("Total Volatile Organic Compounds: = %u ppb", tvoc);
-  Serial.println();
+  Serial.println("\r");
   	Serial.printf("CO2 concentration: %u ppm", co2);
-	Serial.println();
+	Serial.println("\r");
     Serial.print("Time: ");
     Serial.println(rtc.getTime("RTC0: %A, %B %d %Y %H:%M:%S"));
 
@@ -196,10 +196,15 @@ void update_params(){
 
   day_step++; //increments the daily counter
   Serial.println("variable day_step value = ");  Serial.println(day_step); //debug
-  if (day_step >= DAILYENTRIES) {
-        shift_week(); day_step=0;
-    }
+
+  storeData();
+  if(day_step >= DAILYENTRIES) {
+    shift_week(); day_step=0;
+    storeTime();
+    commitData();
+  }
   else store_week_data();
+
 }
 
 
@@ -370,7 +375,7 @@ void parseData(uint16_t i, char* ex_string){
   vcr = readingBuffer[i*DATASIZE+8] << 8 | readingBuffer[i*DATASIZE+9];
   //co2r = readingBuffer[i*DATASIZE+10] << 8 | readingBuffer[i*DATASIZE+11];
 
-  snprintf(row, 64, "%llu;%f;%f;%f;%u\n", sr*2, (float)tr/100, (float)hr/100, (float)pr/100+500, vcr);
+  snprintf(row, 64, "%llu;%f;%f;%f;%u\r\n", sr*2, (float)tr/100, (float)hr/100, (float)pr/100+500, vcr);
 
   for(int i=0; i < 64; i++) ex_string[i] = row[i];
 
@@ -378,15 +383,13 @@ void parseData(uint16_t i, char* ex_string){
 
 ////////////////////////////
 
-
-
-
 void sendHistory(AsyncWebServerRequest *request){
     //static size_t maxLen = 256;
     AsyncWebServerResponse *response = request->beginChunkedResponse("text/plain", [](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
       static byte currentIndexForChunk = 0;
+      static File dir = SPIFFS.open("/data/");
 
-    static size_t dataLen = (day_count*day_step+1)*(64);
+    static size_t dataLen = (DAILYENTRIES*day_count)*(64);
     rows_sent = 0;
 
     //Write up to "maxLen" bytes into "buffer" and return the amount written.
@@ -402,7 +405,11 @@ void sendHistory(AsyncWebServerRequest *request){
       return strlen((char*) buffer);
     } else buffer[0] = '\0';
 
-    if (currentIndexForChunk == day_step) { // we are done, send the footer
+    size_t initialBufferLength = strlen((char*) buffer);
+
+    File file = dir.openNextFile();
+
+    if (!file) { // we are done, send the footer
       strncat((char*)buffer, "\nLast line", 11);
       currentIndexForChunk++;
       return strlen((char*) buffer);
@@ -411,28 +418,40 @@ void sendHistory(AsyncWebServerRequest *request){
       return 0;
     }
 
+    while(file){
+      char row[64];
+        uint32_t ptr = 0;
+        while(file.available()) {
+            readingBuffer[ptr] = file.read();
+            ptr++;
+        }
 
-    size_t initialBufferLength = strlen((char*) buffer);
+        file.close();
 
- 
-      //String row = String(regtime[i])+";"+String(regtemp[i], 2)+";"+String(reghum[i], 2)+";"+String(regpres[i], 2)+";"+String(regpol[i])+"\n";
-        //static String row = "\n";
-        static char row[64];
-        static time_t tim;
-        static int16_t t;
-        static uint16_t h;
-        static uint16_t p;
-        static uint16_t vc;
-        //static uint16_t co2;
+        for(uint32_t i=0; i<DAILYENTRIES; i++){
+            parseData(i, row);
+            strcpy((char*)buffer, row);
+            Serial.println(row);
+        }
+        
+        for (size_t i = 0; i < 4; i++)
+        {
+            acquiredTime = readingBuffer[DAILYENTRIES*DATASIZE] << 56;
+            acquiredTime = readingBuffer[DAILYENTRIES*DATASIZE+1] << 48;
+            acquiredTime = readingBuffer[DAILYENTRIES*DATASIZE+2] << 40;
+            acquiredTime = readingBuffer[DAILYENTRIES*DATASIZE+3] << 32;
+            acquiredTime = readingBuffer[DAILYENTRIES*DATASIZE+4] << 24;
+            acquiredTime = readingBuffer[DAILYENTRIES*DATASIZE+5] << 16;
+            acquiredTime = readingBuffer[DAILYENTRIES*DATASIZE+6] << 8;
+            acquiredTime = readingBuffer[DAILYENTRIES*DATASIZE+7];
 
-/////////////////////////////////////
-//////////////////////////////////////
-////////////////////////////////////////
-
+        }
+        ;
+        snprintf(row, 64, "\nTimestamp = %" );
         strcpy((char*)buffer, row);
-        //memcpy (buffer, &row, row.length());
+        Serial.println(row);
+    }
 
-      Serial.println(row);
       rows_sent++;
       currentIndexForChunk++;
       return strlen((char*) buffer);
@@ -441,8 +460,8 @@ void sendHistory(AsyncWebServerRequest *request){
     });
     response->addHeader("Server","SunnyBreeze History");
     request->send(response);
-
 }
+
 
 class CaptiveRequestHandler : public AsyncWebHandler {
 public:
