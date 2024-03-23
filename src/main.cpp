@@ -430,7 +430,7 @@ void sendHistory(AsyncWebServerRequest *request){
 
         for(uint32_t i=0; i<DAILYENTRIES; i++){
             parseData(i, row);
-            strcpy((char*)buffer, row);
+            strncat((char*)buffer, row, 64);
             Serial.println(row);
         }
         
@@ -446,9 +446,9 @@ void sendHistory(AsyncWebServerRequest *request){
             acquiredTime = readingBuffer[DAILYENTRIES*DATASIZE+7];
 
         }
-        ;
+        
         snprintf(row, 64, "\nTimestamp = %" );
-        strcpy((char*)buffer, row);
+        strncat((char*)buffer, row);
         Serial.println(row);
     }
 
