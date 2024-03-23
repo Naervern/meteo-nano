@@ -11,6 +11,7 @@
 #include "htmls.h"
 #include <Wire.h>
 #include "SPIFFS.h"
+#include "FS.h"
 
 #define TIMERDELAY 30       // Delay between measurements in seconds
 #define TOTALENTRIES 115200 // Delay between measurements in seconds
@@ -151,62 +152,6 @@ void shift_week(){
   histpressure[0] = pressure;
   histtvoc[0] = tvoc;
 }
-
-
-void update_params(){
-  //digitalWrite(ENS_CS, LOW);
-  //temperature = aht20.getTemperature();
-  humidity = aht20.getHumidity();
-  //ENS160.setTempAndHum(temperature, humidity);
-  
-    //ens160.setOperatingMode(0x02);
-    ens160.checkDataStatus();
-
-    Serial.print("Gas Sensor Status Flag (0 - Standard, 1 - Warm up, 2 - Initial Start Up): ");
-    Serial.println(ens160.getFlags());
-	
-		Serial.print("Air Quality Index (1-5) : ");
-		Serial.println(ens160.getAQI());
-
-    co2 = ens160.getECO2();
-    tvoc = ens160.getTVOC();
-    //ens160.setOperatingMode(0x00);
-    
-  //ENS160.setPWRMode(ENS160_SLEEP_MODE);
-  //pressure = bmp280.readPressure();
-  bmp280.read();
-  temperature = bmp280.temperature;
-  pressure = bmp280.pressure;
-
-  Serial.println("New measurement");
-  Serial.printf("Temperature = %.2f °C", temperature);
-    Serial.println("\r");
-  Serial.printf("Humidity = %.2f %%", humidity);
-    Serial.println("\r");
-  Serial.printf("Pressure = %.2f hPa", pressure);
-    Serial.println("\r");
-  Serial.printf("Total Volatile Organic Compounds: = %u ppb", tvoc);
-  Serial.println("\r");
-  	Serial.printf("CO2 concentration: %u ppm", co2);
-	Serial.println("\r");
-    Serial.print("Time: ");
-    Serial.println(rtc.getTime("RTC0: %A, %B %d %Y %H:%M:%S"));
-
-  //save_entry(temperature, humidity, pressure, tvoc);
-
-  day_step++; //increments the daily counter
-  Serial.println("variable day_step value = ");  Serial.println(day_step); //debug
-
-  storeData();
-  if(day_step >= DAILYENTRIES) {
-    shift_week(); day_step=0;
-    storeTime();
-    commitData();
-  }
-  else store_week_data();
-
-}
-
 
 
 String processor(const String& var){
@@ -448,7 +393,7 @@ void sendHistory(AsyncWebServerRequest *request){
         }
         
         snprintf(row, 64, "\nTimestamp = %" );
-        strncat((char*)buffer, row);
+        strncat((char*)buffer, row, 12288);
         Serial.println(row);
     }
 
@@ -521,7 +466,59 @@ void mode_normal(){
 */
 
 
+void update_params(){
+  //digitalWrite(ENS_CS, LOW);
+  //temperature = aht20.getTemperature();
+  humidity = aht20.getHumidity();
+  //ENS160.setTempAndHum(temperature, humidity);
+  
+    //ens160.setOperatingMode(0x02);
+    ens160.checkDataStatus();
 
+    Serial.print("Gas Sensor Status Flag (0 - Standard, 1 - Warm up, 2 - Initial Start Up): ");
+    Serial.println(ens160.getFlags());
+	
+		Serial.print("Air Quality Index (1-5) : ");
+		Serial.println(ens160.getAQI());
+
+    co2 = ens160.getECO2();
+    tvoc = ens160.getTVOC();
+    //ens160.setOperatingMode(0x00);
+    
+  //ENS160.setPWRMode(ENS160_SLEEP_MODE);
+  //pressure = bmp280.readPressure();
+  bmp280.read();
+  temperature = bmp280.temperature;
+  pressure = bmp280.pressure;
+
+  Serial.println("New measurement");
+  Serial.printf("Temperature = %.2f °C", temperature);
+    Serial.println("\r");
+  Serial.printf("Humidity = %.2f %%", humidity);
+    Serial.println("\r");
+  Serial.printf("Pressure = %.2f hPa", pressure);
+    Serial.println("\r");
+  Serial.printf("Total Volatile Organic Compounds: = %u ppb", tvoc);
+  Serial.println("\r");
+  	Serial.printf("CO2 concentration: %u ppm", co2);
+	Serial.println("\r");
+    Serial.print("Time: ");
+    Serial.println(rtc.getTime("RTC0: %A, %B %d %Y %H:%M:%S"));
+
+  //save_entry(temperature, humidity, pressure, tvoc);
+
+  day_step++; //increments the daily counter
+  Serial.println("variable day_step value = ");  Serial.println(day_step); //debug
+
+  storeData();
+  if(day_step >= DAILYENTRIES) {
+    shift_week(); day_step=0;
+    storeTime();
+    commitData();
+  }
+  else store_week_data();
+
+}
 
 
 
@@ -549,7 +546,7 @@ void setup() {
   Serial.begin(115200);
   Wire.begin();
 
-  while (!Serial) {}; // wait for serial port to connect. Needed for native USB port only, easier debugging :P
+  //while (!Serial) {}; // wait for serial port to connect. Needed for native USB port only, easier debugging :P
   //delay(2000); //debug stuff
 
   if(psramInit()){
