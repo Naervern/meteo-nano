@@ -2,6 +2,12 @@
 #include <Wire.h>
 #include "BME280_I2C.h"
 
+BME280_I2C bme;
+
+float temps;
+float presus;
+float humids;
+
 void setup() {
   Serial.begin(115200);
   Wire.begin();

@@ -175,10 +175,8 @@ const char settime_html[] PROGMEM = R"rawliteral(
 <h2 id="date"></h2><br>
 <button onclick="sdt()">Sync</button>
 <script>
-function updt(){document.getElementById("date").innerHTML=Date.now()/1000>>0;}
-updt();
 sdt();
-setInterval(updt,1000);
+setInterval(()=>{document.getElementById("date").innerHTML=Date.now()/1000>>0;},1000);
 function sdt(){
     var xhr = new XMLHttpRequest();
     let tn = Date.now()/1000>>0;

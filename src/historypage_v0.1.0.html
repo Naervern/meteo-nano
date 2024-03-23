@@ -8,9 +8,7 @@
 </main>
 <script>
 // Creates new WebSocket object with a wss URI as the parameter
-// const socket = new WebSocket('wss://game.example.com/ws/updates');
-const socket = new WebSocket('wss://192.168.4.1/history/s');
-socket.binaryType = "arraybuffer";
+const socket = new WebSocket('wss://game.example.com/ws/updates');
 
 // Fired when a connection with a WebSocket is opened
 socket.onopen = function () {
@@ -22,28 +20,13 @@ socket.onopen = function () {
 
 // Fired when data is received through a WebSocket
 socket.onmessage = function(event) {
-  var bytearray = new Uint8Array(event.data);
   handleUpdateData(event.data);
   ()=>{
-    let length = bytearray.readUInt8(0);
-    //let buffer = new SharedArrayBuffer(16*length.to);
-    //let row0 = new ;
     //document.getElementById("data").innerHTML +=
     
-    for (let i=0; i<length; i++){
-      //let t, tp, h, p, oc, c;
-      //include row time, 8 bytes in esp time_t
-      main.innerHTML += "\n" + bytearray.readUIntBE(1+(i*16), 8) + ";";
-      //temperature, 2 bytes int in centi-celsius
-      main.innerHTML += (bytearray.readIntBE(9+(i*16), 2)/100) + ";";
-      //humidity, 2 bytes int in deci-millis
-      main.innerHTML += (bytearray.readUIntBE(11+(i*16), 2)/100) + ";";
-      //pressure, 2 bytes int in Pa with a -500 hPa offset
-      main.innerHTML += (bytearray.readUIntBE(13+(i*16), 2)/100+500) + ";";
-      //TVOC, 2 bytes int in ppb
-      main.innerHTML += bytearray.readUIntBE(15+(i*16), 2) + ";";
-
-      }
+    let t, tp, h, p, oc, c;
+    main.innerHTML += 
+    
     }
 };
 
@@ -58,38 +41,3 @@ socket.onerror = function(event) {
 };
 </script>
 </html>
-
-<!--
-More reference:
-//https://stackoverflow.com/a/11426037
-
-
-connection = new WebSocket( 'ws://localhost:1740' );
-connection.binaryType = "arraybuffer";
-connection.onopen = onopen;
-connection.onmessage = onmessage;
-connection.onclose = onclose;
-connection.onerror = onerror;
-
-if ( event.data instanceof ArrayBuffer ) {
-    var bytearray = new Uint8Array( event.data );
-    var tempcanvas = document.createElement( 'canvas' );
-    tempcanvas.height = imageheight;
-    tempcanvas.width = imagewidth;
-    var tempcontext = tempcanvas.getContext( '2d' );
-    var imgdata = tempcontext.getImageData( 0, 0, imagewidth, imageheight );
-    var imgdatalen = imgdata.data.length;
-    for ( var i = 8; i < imgdatalen; i++ ) {
-        imgdata.data[i] = bytearray[i];
-    }
-    tempcontext.putImageData( imgdata, 0, 0 );
-    var img = document.createElement( 'img' );
-    img.height = imageheight;
-    img.width = imagewidth;
-    img.src = tempcanvas.toDataURL();
-    chatdiv.appendChild( img );
-    chatdiv.innerHTML = chatdiv.innerHTML + "<br />";
-}
-
-
--->
