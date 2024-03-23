@@ -577,9 +577,11 @@ void setup() {
   if ( !aht20.begin() ) Serial.println("AHT20 not detected. Please check wiring."); else Serial.println("AHT20 check OK!.");
   if ( !ens160.begin() ) Serial.println("Could not communicate with the ENS160, check wiring."); else Serial.println("ENS160 check OK!");
   ens160.setOperatingMode(SFE_ENS160_RESET);
+  delay(100);
   ens160.setOperatingMode(SFE_ENS160_STANDARD);
+  delay(100);
   ens160.setOperatingMode(0x02);
-
+  delay(100);
   update_params();
   day_step--;
 
