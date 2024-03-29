@@ -494,6 +494,10 @@ void storeTime(){
 bool commitData(){
   File file = SPIFFS.open("/data/"+(String)day_count+".txt", "w");
 
+    if(!file) {
+      FS::fs.mkdir("/data/");
+      file = SPIFFS.open("/data/"+(String)day_count, "w");
+    }
     if(!file) return false;
 
   file.write(storingbuffer, BUFFERSIZE);
