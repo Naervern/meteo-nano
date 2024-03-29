@@ -15,8 +15,8 @@
             "args": [],
             "stopAtEntry": false,
             "externalConsole": true,
-            "cwd": "c:/Users/Naervern/Documents/GitHub/meteo-nano",
-            "program": "c:/Users/Naervern/Documents/GitHub/meteo-nano/build/Debug/outDebug",
+            "cwd": "c:/Users/Naervern/Documents/GitHub/meteo-nano/src",
+            "program": "c:/Users/Naervern/Documents/GitHub/meteo-nano/src/build/Debug/outDebug",
             "MIMode": "gdb",
             "miDebuggerPath": "gdb",
             "setupCommands": [

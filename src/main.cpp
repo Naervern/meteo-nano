@@ -7,11 +7,11 @@
 #include "AsyncUDP.h"
 #include <AHT20.h>
 #include "SparkFun_ENS160.h"
-#include "BME280_I2C.h"
+//#include "BME280_I2C.h"
 #include "htmls.h"
 #include <Wire.h>
+#include <FS.h>
 #include "SPIFFS.h"
-#include "FS.h"
 
 #define TIMERDELAY 30       // Delay between measurements in seconds
 #define TOTALENTRIES 115200 // Delay between measurements in seconds
@@ -30,7 +30,224 @@
 #define TIMEZONE "EET-2EEST,M3.5.0/3,M10.5.0/4"
 
 
-//////////////////////////////////////////////////////
+////////////////////////////////////////////////////// -- BMP280 lib... because that thing isn't loading properly it seems
+
+
+class BME280_I2C{
+    
+    public:
+
+    const uint8_t ADDRESS = 0x76; //default address is 0x76
+
+    BME280_I2C(){}
+
+    BME280_I2C(const uint8_t& x) : ADDRESS(x) {}
+
+    uint8_t osrs_t = 1;             //Temperature oversampling x 1
+    uint8_t osrs_p = 1;             //Pressure oversampling x 1
+    uint8_t osrs_h = 1;             //Humidity oversampling x 1
+    uint8_t mode = 3;               //Normal mode
+    uint8_t t_sb = 5;               //Tstandby 1000ms
+    uint8_t filter = 0;             //Filter off 
+    uint8_t spi3w_en = 0;           //3-wire SPI Disable
+    
+    unsigned long int hum_raw,temp_raw,pres_raw;
+    signed long int t_fine;
+    double temp_act = 0.0, press_act = 0.0,hum_act=0.0;
+    signed long int temp_cal;
+    unsigned long int press_cal,hum_cal;
+
+    float temperature {0};
+    float pressure {0};
+    float humidity {0};
+
+    void read(){
+        readData();
+          temp_cal = calibration_T(temp_raw);
+          temp_act = (double)temp_cal / 100.0;
+          press_cal = calibration_P(pres_raw);
+          press_act = (double)press_cal / 100.0;
+          hum_cal = calibration_H(hum_raw);
+          hum_act = (double)hum_cal / 1024.0;
+          temperature = (float)temp_act;
+          pressure = (float)press_act;
+          humidity = (float)hum_act;
+    }
+
+    bool begin(){
+        //Wire.begin();
+        writeReg(0xF2,ctrl_hum_reg);
+        writeReg(0xF4,ctrl_meas_reg);
+        writeReg(0xF5,config_reg);
+        
+        //begin Trim
+        uint8_t i=0;
+        Wire.beginTransmission(ADDRESS);
+        Wire.write(0x88);
+        Wire.endTransmission();
+        Wire.requestFrom(ADDRESS,24);
+        while(Wire.available()){
+            data[i] = Wire.read();
+            i++;
+        }
+            
+        Wire.beginTransmission(ADDRESS);
+        Wire.write(0xA1);
+        Wire.endTransmission();
+        Wire.requestFrom(ADDRESS,1);
+        data[i] = Wire.read();
+        i++;
+        
+        Wire.beginTransmission(ADDRESS);
+        Wire.write(0xE1);
+        Wire.endTransmission();
+        Wire.requestFrom(ADDRESS,7);
+        while(Wire.available()){
+            data[i] = Wire.read();
+            i++;    
+        }
+        dig_T1 = (data[1] << 8) | data[0];
+        dig_T2 = (data[3] << 8) | data[2];
+        dig_T3 = (data[5] << 8) | data[4];
+        dig_P1 = (data[7] << 8) | data[6];
+        dig_P2 = (data[9] << 8) | data[8];
+        dig_P3 = (data[11]<< 8) | data[10];
+        dig_P4 = (data[13]<< 8) | data[12];
+        dig_P5 = (data[15]<< 8) | data[14];
+        dig_P6 = (data[17]<< 8) | data[16];
+        dig_P7 = (data[19]<< 8) | data[18];
+        dig_P8 = (data[21]<< 8) | data[20];
+        dig_P9 = (data[23]<< 8) | data[22];
+        dig_H1 = data[24];
+        dig_H2 = (data[26]<< 8) | data[25];
+        dig_H3 = data[27];
+        dig_H4 = (data[28]<< 4) | (0x0F & data[29]);
+        dig_H5 = (data[30]<< 4) | ((data[29] >> 4) & 0x0F);
+        dig_H6 = data[31];
+        return true;
+    }
+
+    float getTemperature(){ //returns temperature in ºC
+        readData();
+        temp_cal = calibration_T(temp_raw);
+        temp_act = (double)temp_cal / 100.0;
+        return((float)temp_act);
+    }
+
+    float getPressure(){ //returns pressure in hPa
+        readData();
+        press_cal = calibration_P(pres_raw);
+        press_act = (double)press_cal / 100.0;
+        return((float)press_act);
+    }
+
+    float getHumidity(){ //returns relative atmospheric humidity in %
+        readData();
+        hum_cal = calibration_H(hum_raw);
+        hum_act = (double)hum_cal / 1024.0;
+        return((float)hum_act);
+    }
+    
+    void readData(){
+        int i = 0;
+        uint32_t data[8];
+        Wire.beginTransmission(ADDRESS);
+        Wire.write(0xF7);
+        Wire.endTransmission();
+        Wire.requestFrom(ADDRESS,8);
+        while(Wire.available()){
+            data[i] = Wire.read();
+            i++;
+        }
+        pres_raw = (data[0] << 12) | (data[1] << 4) | (data[2] >> 4);
+        temp_raw = (data[3] << 12) | (data[4] << 4) | (data[5] >> 4);
+        hum_raw  = (data[6] << 8) | data[7];
+    }
+
+    private:
+        uint8_t data[32];
+
+        uint8_t ctrl_meas_reg = (osrs_t << 5) | (osrs_p << 2) | mode;
+        uint8_t config_reg    = (t_sb << 5) | (filter << 2) | spi3w_en;
+        uint8_t ctrl_hum_reg  = osrs_h;
+
+        uint16_t dig_T1;
+        int16_t dig_T2;
+        int16_t dig_T3;
+        uint16_t dig_P1;
+        int16_t dig_P2;
+        int16_t dig_P3;
+        int16_t dig_P4;
+        int16_t dig_P5;
+        int16_t dig_P6;
+        int16_t dig_P7;
+        int16_t dig_P8;
+        int16_t dig_P9;
+        int8_t  dig_H1;
+        int16_t dig_H2;
+        int8_t  dig_H3;
+        int16_t dig_H4;
+        int16_t dig_H5;
+        int8_t  dig_H6;
+
+        void writeReg(uint8_t reg_address, uint8_t data){
+            Wire.beginTransmission(ADDRESS);
+            Wire.write(reg_address);
+            Wire.write(data);
+            Wire.endTransmission();    
+        }
+
+    signed long int calibration_T(signed long int adc_T)    {        
+        signed long int var1, var2, T;
+        var1 = ((((adc_T >> 3) - ((signed long int)dig_T1<<1))) * ((signed long int)dig_T2)) >> 11;
+        var2 = (((((adc_T >> 4) - ((signed long int)dig_T1)) * ((adc_T>>4) - ((signed long int)dig_T1))) >> 12) * ((signed long int)dig_T3)) >> 14;
+        
+        t_fine = var1 + var2;
+        T = (t_fine * 5 + 128) >> 8;
+        return T; 
+    }
+
+    unsigned long int calibration_P(signed long int adc_P)    {
+        signed long int var1, var2;
+        unsigned long int P;
+        var1 = (((signed long int)t_fine)>>1) - (signed long int)64000;
+        var2 = (((var1>>2) * (var1>>2)) >> 11) * ((signed long int)dig_P6);
+        var2 = var2 + ((var1*((signed long int)dig_P5))<<1);
+        var2 = (var2>>2)+(((signed long int)dig_P4)<<16);
+        var1 = (((dig_P3 * (((var1>>2)*(var1>>2)) >> 13)) >>3) + ((((signed long int)dig_P2) * var1)>>1))>>18;
+        var1 = ((((32768+var1))*((signed long int)dig_P1))>>15);
+        if (var1 == 0)
+        {
+            return 0;
+        }    
+        P = (((unsigned long int)(((signed long int)1048576)-adc_P)-(var2>>12)))*3125;
+        if(P<0x80000000)
+        {
+        P = (P << 1) / ((unsigned long int) var1);   
+        }
+        else
+        {
+            P = (P / (unsigned long int)var1) * 2;    
+        }
+        var1 = (((signed long int)dig_P9) * ((signed long int)(((P>>3) * (P>>3))>>13)))>>12;
+        var2 = (((signed long int)(P>>2)) * ((signed long int)dig_P8))>>13;
+        P = (unsigned long int)((signed long int)P + ((var1 + var2 + dig_P7) >> 4));
+        return P;
+    }
+
+    unsigned long int calibration_H(signed long int adc_H)    {
+        signed long int v_x1;        
+        v_x1 = (t_fine - ((signed long int)76800));
+        v_x1 = (((((adc_H << 14) -(((signed long int)dig_H4) << 20) - (((signed long int)dig_H5) * v_x1)) + 
+        ((signed long int)16384)) >> 15) * (((((((v_x1 * ((signed long int)dig_H6)) >> 10) * 
+        (((v_x1 * ((signed long int)dig_H3)) >> 11) + ((signed long int) 32768))) >> 10) + (( signed long int)2097152)) * 
+        ((signed long int) dig_H2) + 8192) >> 14));
+        v_x1 = (v_x1 - (((((v_x1 >> 15) * (v_x1 >> 15)) >> 7) * ((signed long int)dig_H1)) >> 4));
+        v_x1 = (v_x1 < 0 ? 0 : v_x1);
+        v_x1 = (v_x1 > 419430400 ? 419430400 : v_x1);
+        return (unsigned long int)(v_x1 >> 12);   
+    }
+};
 
 //////////////////////////////////////////////////////
 
@@ -82,7 +299,6 @@ RTC_SLOW_ATTR uint16_t day_count = 0; //counts days logged in the system
 
 bool measurement_trigger = false;
 bool midnight_trigger = false;
-bool wifi_on = false;
 
 uint8_t readingBuffer[BUFFERSIZE];
 
@@ -222,9 +438,17 @@ void getHistory(String& str){
 uint16_t count_files() //this function returns how many entries have been saved in the SPIFFS
 {
   static uint16_t count = 0;
-  File root = SPIFFS.open("/data/");
-  File file = root.openNextFile();
-  while(file) count++ ;
+  File root = SPIFFS.open("/");
+    File file = root.openNextFile();
+    while(file){
+      count++;
+        Serial.print("  FILE: ");
+        Serial.print(file.name());
+        Serial.print("\tSIZE: ");
+        Serial.println(file.size());
+
+        file = root.openNextFile();
+    }
   return count;
 }
 
@@ -257,10 +481,10 @@ bool storeData(){
 
 void storeTime(){
   static uint64_t timeToStore = rtc.getEpoch();
-  storingbuffer[DAILYENTRIES*DATASIZE] = timeToStore >> 56;
-  storingbuffer[DAILYENTRIES*DATASIZE+1] = timeToStore >> 48;
-  storingbuffer[DAILYENTRIES*DATASIZE+2] = timeToStore >> 40;
-  storingbuffer[DAILYENTRIES*DATASIZE+3] = timeToStore >> 32;
+  //storingbuffer[DAILYENTRIES*DATASIZE] = timeToStore >> 56;
+  //storingbuffer[DAILYENTRIES*DATASIZE+1] = timeToStore >> 48;
+  //storingbuffer[DAILYENTRIES*DATASIZE+2] = timeToStore >> 40;
+  //storingbuffer[DAILYENTRIES*DATASIZE+3] = timeToStore >> 32;
   storingbuffer[DAILYENTRIES*DATASIZE+4] = timeToStore >> 24;
   storingbuffer[DAILYENTRIES*DATASIZE+5] = timeToStore >> 16;
   storingbuffer[DAILYENTRIES*DATASIZE+6] = timeToStore >> 8;
@@ -268,18 +492,18 @@ void storeTime(){
 }
 
 bool commitData(){
-  File file = SPIFFS.open("/data/"+(String)day_count, "w");
+  File file = SPIFFS.open("/data/"+(String)day_count+".txt", "w");
 
     if(!file) return false;
 
-  file.write(storingbuffer, sizeof(storingbuffer));
-  for(uint8_t i : storingbuffer) i=0;
+  file.write(storingbuffer, BUFFERSIZE);
+  for(uint8_t i : storingbuffer) file.print(i);
   file.close();
   return true;
 }
 
 uint16_t readData(uint16_t i){
-  File file = SPIFFS.open("/data/"+(String)i, "r");
+  File file = SPIFFS.open("/data/"+(String)i+".txt", "r");
   size_t len = 0;
 
   if(file && !file.isDirectory()){
@@ -334,7 +558,8 @@ void sendHistory(AsyncWebServerRequest *request){
       static byte currentIndexForChunk = 0;
       static File dir = SPIFFS.open("/data/");
 
-    static size_t dataLen = (DAILYENTRIES*day_count)*(64);
+      static size_t dataLen = (DAILYENTRIES*day_count)*(64);
+      static size_t downloadRows = 0;
     rows_sent = 0;
 
     //Write up to "maxLen" bytes into "buffer" and return the amount written.
@@ -346,7 +571,7 @@ void sendHistory(AsyncWebServerRequest *request){
       //buffer='\0';
       currentIndexForChunk = 0; 
       strncat((char*)buffer, "First line\n", 12);
-      //for(int i=0; i<TOTALENTRIES; i++){} 
+      downloadRows = 0;
       return strlen((char*) buffer);
     } else buffer[0] = '\0';
 
@@ -357,7 +582,8 @@ void sendHistory(AsyncWebServerRequest *request){
     if (!file) { // we are done, send the footer
       strncat((char*)buffer, "\nLast line", 11);
       currentIndexForChunk++;
-      return strlen((char*) buffer);
+      //return strlen((char*) buffer);
+      return 0;
     } else if (currentIndexForChunk > day_step) { // the footer has been sent, we close this request by sending a length of 0
       // but for the sake of the demo, we add something in the log to make it grow for next refresh
       return 0;
@@ -381,10 +607,10 @@ void sendHistory(AsyncWebServerRequest *request){
         
         for (size_t i = 0; i < 4; i++)
         {
-            acquiredTime = readingBuffer[DAILYENTRIES*DATASIZE] << 56;
-            acquiredTime = readingBuffer[DAILYENTRIES*DATASIZE+1] << 48;
-            acquiredTime = readingBuffer[DAILYENTRIES*DATASIZE+2] << 40;
-            acquiredTime = readingBuffer[DAILYENTRIES*DATASIZE+3] << 32;
+            //acquiredTime = readingBuffer[DAILYENTRIES*DATASIZE] << 56;
+            //acquiredTime = readingBuffer[DAILYENTRIES*DATASIZE+1] << 48;
+            //acquiredTime = readingBuffer[DAILYENTRIES*DATASIZE+2] << 40;
+            //acquiredTime = readingBuffer[DAILYENTRIES*DATASIZE+3] << 32;
             acquiredTime = readingBuffer[DAILYENTRIES*DATASIZE+4] << 24;
             acquiredTime = readingBuffer[DAILYENTRIES*DATASIZE+5] << 16;
             acquiredTime = readingBuffer[DAILYENTRIES*DATASIZE+6] << 8;
@@ -508,7 +734,7 @@ void update_params(){
   //save_entry(temperature, humidity, pressure, tvoc);
 
   day_step++; //increments the daily counter
-  Serial.println("variable day_step value = ");  Serial.println(day_step); //debug
+  Serial.print("variable day_step value = ");  Serial.println(day_step); //debug
 
   storeData();
   if(day_step >= DAILYENTRIES) {
@@ -546,7 +772,7 @@ void setup() {
   Serial.begin(115200);
   Wire.begin();
 
-  //while (!Serial) {}; // wait for serial port to connect. Needed for native USB port only, easier debugging :P
+  while (!Serial) {}; // wait for serial port to connect. Needed for native USB port only, easier debugging :P
   //delay(2000); //debug stuff
 
   if(psramInit()){
@@ -559,7 +785,7 @@ void setup() {
 
   if (!SPIFFS.begin(true)) {
     Serial.println("An Error has occurred while mounting SPIFFS");
-    delay(0xFFFFFFFF);
+    return;
   }
 
   day_count = count_files();
@@ -612,4 +838,125 @@ void loop() {
     lastTime = millis();
   }
   
+}
+
+
+/////////////////////////////////////////////////////////////////////////////////
+
+bool listDir(fs::FS &fs, const char * dirname, uint8_t levels){
+    Serial.printf("Listing directory: %s\n", dirname);
+
+    File root = fs.open(dirname);
+    if(!root){
+        Serial.println("Failed to open directory");
+        return false;
+    }
+    if(!root.isDirectory()){
+        Serial.println("Not a directory");
+        return false;
+    }
+
+    File file = root.openNextFile();
+    while(file){
+        if(file.isDirectory()){
+            Serial.print("  DIR : ");
+            Serial.print (file.name());
+            if(levels){
+                listDir(fs, file.path(), levels -1);
+            }
+        } else {
+            Serial.print("  FILE: ");
+            Serial.print(file.name());
+            Serial.print("  SIZE: ");
+            Serial.print(file.size());
+            time_t t= file.getLastWrite();
+            struct tm * tmstruct = localtime(&t);
+            Serial.printf("  LAST WRITE: %d-%02d-%02d %02d:%02d:%02d\n",(tmstruct->tm_year)+1900,( tmstruct->tm_mon)+1, tmstruct->tm_mday,tmstruct->tm_hour , tmstruct->tm_min, tmstruct->tm_sec);
+        }
+        file = root.openNextFile();
+    }
+}
+
+void createDir(fs::FS &fs, const char * path){
+    Serial.printf("Creating Dir: %s\n", path);
+    if(fs.mkdir(path)){
+        Serial.println("Dir created");
+    } else {
+        Serial.println("mkdir failed");
+    }
+}
+
+void removeDir(fs::FS &fs, const char * path){
+    Serial.printf("Removing Dir: %s\n", path);
+    if(fs.rmdir(path)){
+        Serial.println("Dir removed");
+    } else {
+        Serial.println("rmdir failed");
+    }
+}
+
+void readFile(fs::FS &fs, const char * path){
+    Serial.printf("Reading file: %s\n", path);
+
+    File file = fs.open(path);
+    if(!file){
+        Serial.println("Failed to open file for reading");
+        return;
+    }
+
+    Serial.print("Read from file: ");
+    while(file.available()){
+        Serial.write(file.read());
+    }
+    file.close();
+}
+
+void writeFile(fs::FS &fs, const char * path, const char * message){
+    Serial.printf("Writing file: %s\n", path);
+
+    File file = fs.open(path, FILE_WRITE);
+    if(!file){
+        Serial.println("Failed to open file for writing");
+        return;
+    }
+    if(file.print(message)){
+        Serial.println("File written");
+    } else {
+        Serial.println("Write failed");
+    }
+    file.close();
+}
+
+void appendFile(fs::FS &fs, const char * path, const char * message){
+    Serial.printf("Appending to file: %s\n", path);
+
+    File file = fs.open(path, FILE_APPEND);
+    if(!file){
+        Serial.println("Failed to open file for appending");
+        return;
+    }
+    if(file.print(message)){
+        Serial.println("Message appended");
+    } else {
+        Serial.println("Append failed");
+    }
+    file.close();
+}
+
+void renameFile(fs::FS &fs, const char * path1, const char * path2){
+    Serial.printf("Renaming file %s to %s\n", path1, path2);
+    if (fs.rename(path1, path2)) {
+        Serial.println("File renamed");
+    } else {
+        Serial.println("Rename failed");
+    }
+}
+
+void deleteFile(fs::FS &fs, const char * path){
+    Serial.printf("Deleting file: %s\n", path);
+    if(fs.remove(path)){
+        Serial.println("File deleted");
+    } else {
+        Serial.println("Delete failed");
+    }
 }
