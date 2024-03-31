@@ -246,6 +246,9 @@ private:
 //////////////////////////////////////////////////////
 
 
+//////////////////////////////////////////////////////
+
+
 DNSServer dnsServer;
 AsyncWebServer server(80);
 
@@ -330,6 +333,7 @@ void update_time() {
   Serial.println("update time function called");
   week_it = rtc.getDayofWeek();
   Serial.printf("weekday: %u ", week_it);
+
   Serial.println();
 }
 
@@ -405,8 +409,6 @@ String processor(const String &var) {
 
   return String();
 }
-
-
 
 void getHistory(String &str) {
 
@@ -581,7 +583,6 @@ void sendHistory(AsyncWebServerRequest *request) {
     //Keep in mind that you can not delay or yield waiting for more data!
 
 
-
     size_t initialBufferLength = strlen((char *)buffer);
 
 
@@ -634,7 +635,6 @@ void sendHistory(AsyncWebServerRequest *request) {
   //response->addHeader("Server","SunnyBreeze History");
   request->send(response);
 }
-
 
 class CaptiveRequestHandler : public AsyncWebHandler {
 public:
@@ -793,6 +793,7 @@ void setup() {
 
   day_count = count_files();
   Serial.printf("A total of %u entries have been discovered in the Flash Storage\n", day_count);
+
   Serial.println();
 
   setCpuFrequencyMhz(160);
@@ -805,6 +806,7 @@ void setup() {
   else Serial.println("AHT20 check OK!.");
   if (!ens160.begin()) Serial.println("Could not communicate with the ENS160, check wiring.");
   else Serial.println("ENS160 check OK!");
+
   ens160.setOperatingMode(SFE_ENS160_RESET);
   delay(100);
   ens160.setOperatingMode(SFE_ENS160_STANDARD);
@@ -998,4 +1000,5 @@ void testFileIO(fs::FS &fs, const char *path) {
   } else {
     Serial.println("- failed to open file for reading");
   }
+
 }

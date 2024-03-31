@@ -6,6 +6,7 @@
 // Configuration: https://docs.platformio.org/en/latest/projectconf/sections/env/options/debug/index.html
 
 {
+
     "version": "0.2.0",
     "configurations": [
         {
