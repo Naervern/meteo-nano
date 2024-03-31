@@ -313,6 +313,7 @@ float humidity;
 float pressure;
 uint16_t tvoc;
 uint16_t co2;
+char timeStr[32];
 
 BME280_I2C bmp280;
 
@@ -492,28 +493,31 @@ void storeTime(){
 }
 
 bool commitData(){
-  File file = SPIFFS.open("/data/"+(String)day_count+".txt", "w");
-
-    if(!file) {
-      FS::fs.mkdir("/data/");
-      file = SPIFFS.open("/data/"+(String)day_count, "w");
-    }
-    if(!file) return false;
+  File file = SPIFFS.open("/data/"+(String)day_count, FILE_WRITE);
 
   file.write(storingbuffer, BUFFERSIZE);
+
+    if(!file) return false;
   for(uint8_t i : storingbuffer) file.print(i);
   file.close();
   return true;
 }
 
-uint16_t readData(uint16_t i){
-  File file = SPIFFS.open("/data/"+(String)i+".txt", "r");
+uint16_t readData(uint16_t index){
+  File file = SPIFFS.open("/data/"+(String)index);
+  static int j = 0;
+  while (file.available() && j < BUFFERSIZE) {
+    readingBuffer[j] = file.read();
+    j++;
+  }
+/*
   size_t len = 0;
-
   if(file && !file.isDirectory()){
     len = file.size();
     size_t flen = len;
     Serial.print("- reading" );
+
+    
     while(len){
         size_t toRead = len;
         if(toRead > 512){
@@ -523,6 +527,8 @@ uint16_t readData(uint16_t i){
         len -= toRead;
     }
   }
+  */
+  
   file.close();
 
   return 0;
@@ -560,80 +566,83 @@ void sendHistory(AsyncWebServerRequest *request){
     //static size_t maxLen = 256;
     AsyncWebServerResponse *response = request->beginChunkedResponse("text/plain", [](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
       static byte currentIndexForChunk = 0;
-      static File dir = SPIFFS.open("/data/");
-
       static size_t dataLen = (DAILYENTRIES*day_count)*(64);
-      static size_t downloadRows = 0;
-    rows_sent = 0;
+      static size_t daysSent = 0;
+      
+      if (index == 0) {
+        buffer[0]='\0';
+        currentIndexForChunk = 0; 
+        strcpy((char*)buffer, "First line\n");
+        //return strlen((char*) buffer);
+      } else buffer[0] = '\0';
+
+      //static File dir = SPIFFS.open("/");
+      static File file = SPIFFS.open("/data/"+(String)currentIndexForChunk);
+
+      if (!file) {
+        strcpy((char*)buffer, "\nEnd of function\n");
+        currentIndexForChunk++;
+        return strlen((char*) buffer);
+      } else if (currentIndexForChunk > day_count) { // the footer has been sent, we close this request by sending a length of 0
+        return 0;
+      }
 
     //Write up to "maxLen" bytes into "buffer" and return the amount written.
     //index equals the amount of bytes that have been already sent
     //You will be asked for more data until 0 is returned
     //Keep in mind that you can not delay or yield waiting for more data!
 
-    if (index == 0) {
-      //buffer='\0';
-      currentIndexForChunk = 0; 
-      strncat((char*)buffer, "First line\n", 12);
-      downloadRows = 0;
-      return strlen((char*) buffer);
-    } else buffer[0] = '\0';
 
-    size_t initialBufferLength = strlen((char*) buffer);
 
-    File file = dir.openNextFile();
+    size_t initialBufferLength = strlen((char*) buffer);  
 
-    if (!file) { // we are done, send the footer
-      strncat((char*)buffer, "\nLast line", 11);
-      currentIndexForChunk++;
-      //return strlen((char*) buffer);
-      return 0;
-    } else if (currentIndexForChunk > day_step) { // the footer has been sent, we close this request by sending a length of 0
-      // but for the sake of the demo, we add something in the log to make it grow for next refresh
-      return 0;
-    }
 
-    while(file){
-      char row[64];
         uint32_t ptr = 0;
         while(file.available()) {
             readingBuffer[ptr] = file.read();
             ptr++;
         }
+       
+        static uint16_t sr;
+        static int16_t tr;
+        static uint16_t hr;
+        static uint16_t pr;
+        static uint16_t vcr;
 
-        file.close();
-
-        for(uint32_t i=0; i<DAILYENTRIES; i++){
-            parseData(i, row);
-            strncat((char*)buffer, row, 64);
-            Serial.println(row);
-        }
-        
-        for (size_t i = 0; i < 4; i++)
+        for (int i = 0; i < DAILYENTRIES; i++)
         {
-            //acquiredTime = readingBuffer[DAILYENTRIES*DATASIZE] << 56;
-            //acquiredTime = readingBuffer[DAILYENTRIES*DATASIZE+1] << 48;
-            //acquiredTime = readingBuffer[DAILYENTRIES*DATASIZE+2] << 40;
-            //acquiredTime = readingBuffer[DAILYENTRIES*DATASIZE+3] << 32;
-            acquiredTime = readingBuffer[DAILYENTRIES*DATASIZE+4] << 24;
-            acquiredTime = readingBuffer[DAILYENTRIES*DATASIZE+5] << 16;
-            acquiredTime = readingBuffer[DAILYENTRIES*DATASIZE+6] << 8;
-            acquiredTime = readingBuffer[DAILYENTRIES*DATASIZE+7];
+          char row[64];
 
+          sr = readingBuffer[i*DATASIZE] << 8 | readingBuffer[i*DATASIZE+1];
+          tr = readingBuffer[i*DATASIZE+2] << 8 | readingBuffer[i*DATASIZE+3];
+          hr = readingBuffer[i*DATASIZE+4] << 8 | readingBuffer[i*DATASIZE+5];
+          pr = readingBuffer[i*DATASIZE+6] << 8 | readingBuffer[i*DATASIZE+7];
+          vcr = readingBuffer[i*DATASIZE+8] << 8 | readingBuffer[i*DATASIZE+9];
+          //co2r = readingBuffer[i*DATASIZE+10] << 8 | readingBuffer[i*DATASIZE+11];
+
+          snprintf(row, 64, "%llu;%f;%f;%f;%u\r\n", sr*2, (float)tr/100, (float)hr/100, (float)pr/100+500, vcr);
+          strncat((char*)buffer, "\nTimestamp: ", 64);
         }
+          //acquiredTime = readingBuffer[DAILYENTRIES*DATASIZE] << 56;
+          //acquiredTime = readingBuffer[DAILYENTRIES*DATASIZE+1] << 48;
+          //acquiredTime = readingBuffer[DAILYENTRIES*DATASIZE+2] << 40;
+          //acquiredTime = readingBuffer[DAILYENTRIES*DATASIZE+3] << 32;
+          acquiredTime = readingBuffer[DAILYENTRIES*DATASIZE+4] << 24;
+          acquiredTime = readingBuffer[DAILYENTRIES*DATASIZE+5] << 16;
+          acquiredTime = readingBuffer[DAILYENTRIES*DATASIZE+6] << 8;
+          acquiredTime = readingBuffer[DAILYENTRIES*DATASIZE+7];
         
-        snprintf(row, 64, "\nTimestamp = %" );
-        strncat((char*)buffer, row, 12288);
-        Serial.println(row);
-    }
-
-      rows_sent++;
+        snprintf(timeStr, 32, "%llu", acquiredTime);
+        strncat((char*)buffer, "\nTimestamp: ", 13);
+        strncat((char*)buffer, timeStr, sizeof(timeStr));
+      
       currentIndexForChunk++;
+      file.close();
       return strlen((char*) buffer);
     //return mySource.read(buffer, maxLen);
 
     });
-    response->addHeader("Server","SunnyBreeze History");
+    //response->addHeader("Server","SunnyBreeze History");
     request->send(response);
 }
 
@@ -847,68 +856,49 @@ void loop() {
 
 /////////////////////////////////////////////////////////////////////////////////
 
-bool listDir(fs::FS &fs, const char * dirname, uint8_t levels){
-    Serial.printf("Listing directory: %s\n", dirname);
+
+
+void listDir(fs::FS &fs, const char * dirname, uint8_t levels){
+    Serial.printf("Listing directory: %s\r\n", dirname);
 
     File root = fs.open(dirname);
     if(!root){
-        Serial.println("Failed to open directory");
-        return false;
+        Serial.println("- failed to open directory");
+        return;
     }
     if(!root.isDirectory()){
-        Serial.println("Not a directory");
-        return false;
+        Serial.println(" - not a directory");
+        return;
     }
 
     File file = root.openNextFile();
     while(file){
         if(file.isDirectory()){
             Serial.print("  DIR : ");
-            Serial.print (file.name());
+            Serial.println(file.name());
             if(levels){
                 listDir(fs, file.path(), levels -1);
             }
         } else {
             Serial.print("  FILE: ");
             Serial.print(file.name());
-            Serial.print("  SIZE: ");
-            Serial.print(file.size());
-            time_t t= file.getLastWrite();
-            struct tm * tmstruct = localtime(&t);
-            Serial.printf("  LAST WRITE: %d-%02d-%02d %02d:%02d:%02d\n",(tmstruct->tm_year)+1900,( tmstruct->tm_mon)+1, tmstruct->tm_mday,tmstruct->tm_hour , tmstruct->tm_min, tmstruct->tm_sec);
+            Serial.print("\tSIZE: ");
+            Serial.println(file.size());
         }
         file = root.openNextFile();
     }
 }
 
-void createDir(fs::FS &fs, const char * path){
-    Serial.printf("Creating Dir: %s\n", path);
-    if(fs.mkdir(path)){
-        Serial.println("Dir created");
-    } else {
-        Serial.println("mkdir failed");
-    }
-}
-
-void removeDir(fs::FS &fs, const char * path){
-    Serial.printf("Removing Dir: %s\n", path);
-    if(fs.rmdir(path)){
-        Serial.println("Dir removed");
-    } else {
-        Serial.println("rmdir failed");
-    }
-}
-
 void readFile(fs::FS &fs, const char * path){
-    Serial.printf("Reading file: %s\n", path);
+    Serial.printf("Reading file: %s\r\n", path);
 
     File file = fs.open(path);
-    if(!file){
-        Serial.println("Failed to open file for reading");
+    if(!file || file.isDirectory()){
+        Serial.println("- failed to open file for reading");
         return;
     }
 
-    Serial.print("Read from file: ");
+    Serial.println("- read from file:");
     while(file.available()){
         Serial.write(file.read());
     }
@@ -916,51 +906,105 @@ void readFile(fs::FS &fs, const char * path){
 }
 
 void writeFile(fs::FS &fs, const char * path, const char * message){
-    Serial.printf("Writing file: %s\n", path);
+    Serial.printf("Writing file: %s\r\n", path);
 
     File file = fs.open(path, FILE_WRITE);
     if(!file){
-        Serial.println("Failed to open file for writing");
+        Serial.println("- failed to open file for writing");
         return;
     }
     if(file.print(message)){
-        Serial.println("File written");
+        Serial.println("- file written");
     } else {
-        Serial.println("Write failed");
+        Serial.println("- write failed");
     }
     file.close();
 }
 
 void appendFile(fs::FS &fs, const char * path, const char * message){
-    Serial.printf("Appending to file: %s\n", path);
+    Serial.printf("Appending to file: %s\r\n", path);
 
     File file = fs.open(path, FILE_APPEND);
     if(!file){
-        Serial.println("Failed to open file for appending");
+        Serial.println("- failed to open file for appending");
         return;
     }
     if(file.print(message)){
-        Serial.println("Message appended");
+        Serial.println("- message appended");
     } else {
-        Serial.println("Append failed");
+        Serial.println("- append failed");
     }
     file.close();
 }
 
 void renameFile(fs::FS &fs, const char * path1, const char * path2){
-    Serial.printf("Renaming file %s to %s\n", path1, path2);
+    Serial.printf("Renaming file %s to %s\r\n", path1, path2);
     if (fs.rename(path1, path2)) {
-        Serial.println("File renamed");
+        Serial.println("- file renamed");
     } else {
-        Serial.println("Rename failed");
+        Serial.println("- rename failed");
     }
 }
 
 void deleteFile(fs::FS &fs, const char * path){
-    Serial.printf("Deleting file: %s\n", path);
+    Serial.printf("Deleting file: %s\r\n", path);
     if(fs.remove(path)){
-        Serial.println("File deleted");
+        Serial.println("- file deleted");
     } else {
-        Serial.println("Delete failed");
+        Serial.println("- delete failed");
+    }
+}
+
+void testFileIO(fs::FS &fs, const char * path){
+    Serial.printf("Testing file I/O with %s\r\n", path);
+
+    static uint8_t buf[512];
+    size_t len = 0;
+    File file = fs.open(path, FILE_WRITE);
+    if(!file){
+        Serial.println("- failed to open file for writing");
+        return;
+    }
+
+    size_t i;
+    Serial.print("- writing" );
+    uint32_t start = millis();
+    for(i=0; i<2048; i++){
+        if ((i & 0x001F) == 0x001F){
+          Serial.print(".");
+        }
+        file.write(buf, 512);
+    }
+    Serial.println("");
+    uint32_t end = millis() - start;
+    Serial.printf(" - %u bytes written in %lu ms\r\n", 2048 * 512, end);
+    file.close();
+
+    file = fs.open(path);
+    start = millis();
+    end = start;
+    i = 0;
+    if(file && !file.isDirectory()){
+        len = file.size();
+        size_t flen = len;
+        start = millis();
+        Serial.print("- reading" );
+        while(len){
+            size_t toRead = len;
+            if(toRead > 512){
+                toRead = 512;
+            }
+            file.read(buf, toRead);
+            if ((i++ & 0x001F) == 0x001F){
+              Serial.print(".");
+            }
+            len -= toRead;
+        }
+        Serial.println("");
+        end = millis() - start;
+        Serial.printf("- %u bytes read in %lu ms\r\n", flen, end);
+        file.close();
+    } else {
+        Serial.println("- failed to open file for reading");
     }
 }
