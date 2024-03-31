@@ -582,7 +582,8 @@ void sendHistory(AsyncWebServerRequest *request){
       if (!file) {
         strcpy((char*)buffer, "\nEnd of function\n");
         currentIndexForChunk++;
-        return strlen((char*) buffer);
+        //return strlen((char*) buffer);
+        return 0;
       } else if (currentIndexForChunk > day_count) { // the footer has been sent, we close this request by sending a length of 0
         return 0;
       }
@@ -621,7 +622,7 @@ void sendHistory(AsyncWebServerRequest *request){
           //co2r = readingBuffer[i*DATASIZE+10] << 8 | readingBuffer[i*DATASIZE+11];
 
           snprintf(row, 64, "%llu;%f;%f;%f;%u\r\n", sr*2, (float)tr/100, (float)hr/100, (float)pr/100+500, vcr);
-          strncat((char*)buffer, "\nTimestamp: ", 64);
+          strcpy((char*)buffer, row);
         }
           //acquiredTime = readingBuffer[DAILYENTRIES*DATASIZE] << 56;
           //acquiredTime = readingBuffer[DAILYENTRIES*DATASIZE+1] << 48;
@@ -633,7 +634,7 @@ void sendHistory(AsyncWebServerRequest *request){
           acquiredTime = readingBuffer[DAILYENTRIES*DATASIZE+7];
         
         snprintf(timeStr, 32, "%llu", acquiredTime);
-        strncat((char*)buffer, "\nTimestamp: ", 13);
+        strncat((char*)buffer, "\nTimestamp: ", 64);
         strncat((char*)buffer, timeStr, sizeof(timeStr));
       
       currentIndexForChunk++;
