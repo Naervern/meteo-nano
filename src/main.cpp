@@ -771,7 +771,7 @@ void setupServer() {
 }
 
 void setup() {
-  setCpuFrequencyMhz(240);
+  setCpuFrequencyMhz(160);
   Serial.begin(115200);
   Wire.begin();
 
