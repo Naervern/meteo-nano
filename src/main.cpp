@@ -17,9 +17,9 @@
 #define TOTALENTRIES 115200  // Delay between measurements in seconds
 #define DAILYENTRIES 144     // How many measurements expected to be done during a day. If every 24h/10min = 144
 #define EEPROMMARGIN 128     // Bytes reserved in the beginning of the EEPROM, before the EEPROM space of the measurements
-#define DATASIZE 10          // The sum of stored data types in a storage row. 2 bytes from second-pair in day, plus one int16_t and three uint_16 = 10 bytes
-#define BUFFERSIZE 1448      // Size of the flash storing buffer in Bytes; Consider the amount of measurements per day and data size for this and add 8 for a daily rtc.getEpoch() time recording;
-#define FILESIZE 1536        // File size in bytes, to be used. Consider keeping it a multiple of 256 and calculate a minimum of DAILYENTRIES * DATASIZE
+#define DATASIZE 12          // The sum of stored data types in a storage row. 2 bytes from second-pair in day, plus one int16_t and three uint_16 = 10 bytes
+#define BUFFERSIZE 1736      // Size of the flash storing buffer in Bytes; Consider the amount of measurements per day and data size for this and add 8 for a daily rtc.getEpoch() time recording;
+#define FILESIZE 2048        // File size in bytes, to be used. Consider keeping it a multiple of 256 and calculate a minimum of DAILYENTRIES * DATASIZE
 
 #define SPIFFS_SIZE 3145728  //size of the flash memory to be reserved. 3145728 = 3MB
 
@@ -462,8 +462,8 @@ bool storeData() {
     storingbuffer[i * DATASIZE + 7] = (uint16_t)((pressure - 500) * 100);
     storingbuffer[i * DATASIZE + 8] = (uint16_t)(tvoc) >> 8;
     storingbuffer[i * DATASIZE + 9] = (uint16_t)(tvoc);
-    //storingbuffer[i*DATASIZE+10] = (uint16_t)(co2) >> 8;
-    //storingbuffer[i*DATASIZE+11] = (uint16_t)(co2);
+    storingbuffer[i * DATASIZE+ 10] = (uint16_t)(co2) >> 8;
+    storingbuffer[i * DATASIZE+ 11] = (uint16_t)(co2);
   }
   return true;
 }
@@ -481,7 +481,7 @@ void storeTime() {
 }
 
 bool commitData() {
-  File file = SPIFFS.open("/data/" + (String)day_count, FILE_WRITE);
+  File file = SPIFFS.open("/" + (String)day_count, FILE_WRITE);
 
   file.write(storingbuffer, BUFFERSIZE);
 
@@ -492,7 +492,7 @@ bool commitData() {
 }
 
 uint16_t readData(uint16_t index) {
-  File file = SPIFFS.open("/data/" + (String)index);
+  File file = SPIFFS.open("/" + (String)index);
   static int j = 0;
   while (file.available() && j < BUFFERSIZE) {
     readingBuffer[j] = file.read();
@@ -533,16 +533,16 @@ void parseData(uint16_t i, char *ex_string) {
   static uint16_t hr;
   static uint16_t pr;
   static uint16_t vcr;
-  //static uint16_t co2r;
+  static uint16_t co2r;
 
   sr = readingBuffer[i * DATASIZE] << 8 | readingBuffer[i * DATASIZE + 1];
   tr = readingBuffer[i * DATASIZE + 2] << 8 | readingBuffer[i * DATASIZE + 3];
   hr = readingBuffer[i * DATASIZE + 4] << 8 | readingBuffer[i * DATASIZE + 5];
   pr = readingBuffer[i * DATASIZE + 6] << 8 | readingBuffer[i * DATASIZE + 7];
   vcr = readingBuffer[i * DATASIZE + 8] << 8 | readingBuffer[i * DATASIZE + 9];
-  //co2r = readingBuffer[i*DATASIZE+10] << 8 | readingBuffer[i*DATASIZE+11];
+  co2r = readingBuffer[i * DATASIZE + 10] << 8 | readingBuffer[i * DATASIZE + 11];
 
-  snprintf(row, 64, "%llu;%f;%f;%f;%u\r\n", sr * 2, (float)tr / 100, (float)hr / 100, (float)pr / 100 + 500, vcr);
+  snprintf(row, 64, "%lu;%.2f;%.2f;%.2f;%hu;%hu\r\n", sr * 2, (float)tr / 100, (float)hr / 100, (float)pr / 100 + 500, vcr);
 
   for (int i = 0; i < 64; i++) ex_string[i] = row[i];
 }
@@ -564,7 +564,7 @@ void sendHistory(AsyncWebServerRequest *request) {
     } else buffer[0] = '\0';
 
     //static File dir = SPIFFS.open("/");
-    static File file = SPIFFS.open("/data/" + (String)currentIndexForChunk);
+    File file = SPIFFS.open("/" + (String)currentIndexForChunk);
 
     if (!file) {
       strcpy((char *)buffer, "\nEnd of function\n");
@@ -596,7 +596,9 @@ void sendHistory(AsyncWebServerRequest *request) {
     static uint16_t hr;
     static uint16_t pr;
     static uint16_t vcr;
+    static uint16_t co2r;
 
+    if(file){
     for (int i = 0; i < DAILYENTRIES; i++) {
       char row[64];
 
@@ -605,9 +607,9 @@ void sendHistory(AsyncWebServerRequest *request) {
       hr = readingBuffer[i * DATASIZE + 4] << 8 | readingBuffer[i * DATASIZE + 5];
       pr = readingBuffer[i * DATASIZE + 6] << 8 | readingBuffer[i * DATASIZE + 7];
       vcr = readingBuffer[i * DATASIZE + 8] << 8 | readingBuffer[i * DATASIZE + 9];
-      //co2r = readingBuffer[i*DATASIZE+10] << 8 | readingBuffer[i*DATASIZE+11];
+      co2r = readingBuffer[i*DATASIZE+10] << 8 | readingBuffer[i*DATASIZE+11];
 
-      snprintf(row, 64, "%llu;%f;%f;%f;%u\r\n", sr * 2, (float)tr / 100, (float)hr / 100, (float)pr / 100 + 500, vcr);
+      snprintf(row, 64, "%lu;%.2f;%.2f;%.2f;%hu;%hu\r\n", sr * 2, (float)tr / 100, (float)hr / 100, (float)pr / 100 + 500, vcr, co2r);
       strcpy((char *)buffer, row);
     }
     //acquiredTime = readingBuffer[DAILYENTRIES*DATASIZE] << 56;
@@ -619,12 +621,13 @@ void sendHistory(AsyncWebServerRequest *request) {
     acquiredTime = readingBuffer[DAILYENTRIES * DATASIZE + 6] << 8;
     acquiredTime = readingBuffer[DAILYENTRIES * DATASIZE + 7];
 
-    snprintf(timeStr, 32, "%llu", acquiredTime);
+    snprintf(timeStr, 32, "%li", acquiredTime);
     strncat((char *)buffer, "\nTimestamp: ", 64);
     strncat((char *)buffer, timeStr, sizeof(timeStr));
 
     currentIndexForChunk++;
     file.close();
+    }
     return strlen((char *)buffer);
     //return mySource.read(buffer, maxLen);
   });
@@ -772,8 +775,8 @@ void setup() {
   Serial.begin(115200);
   Wire.begin();
 
-  while (!Serial) {};  // wait for serial port to connect. Needed for native USB port only, easier debugging :P
-  //delay(2000); //debug stuff
+  //while (!Serial) {};  // wait for serial port to connect. Needed for native USB port only, easier debugging :P
+  delay(1000); //debug stuff
 
   if (psramInit()) {
     Serial.println("\nPSRAM is correctly initialized");
