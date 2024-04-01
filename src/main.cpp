@@ -17,9 +17,9 @@
 #define TOTALENTRIES 115200  // Delay between measurements in seconds
 #define DAILYENTRIES 144     // How many measurements expected to be done during a day. If every 24h/10min = 144
 #define EEPROMMARGIN 128     // Bytes reserved in the beginning of the EEPROM, before the EEPROM space of the measurements
-#define DATASIZE 12          // The sum of stored data types in a storage row. 2 bytes from second-pair in day, plus one int16_t and three uint_16 = 10 bytes
-#define BUFFERSIZE 1736      // Size of the flash storing buffer in Bytes; Consider the amount of measurements per day and data size for this and add 8 for a daily rtc.getEpoch() time recording;
-#define FILESIZE 2048        // File size in bytes, to be used. Consider keeping it a multiple of 256 and calculate a minimum of DAILYENTRIES * DATASIZE
+#define DATASIZE 10          // The sum of stored data types in a storage row. 2 bytes from second-pair in day, plus one int16_t and three uint_16 = 10 bytes
+#define BUFFERSIZE 1448      // Size of the flash storing buffer in Bytes; Consider the amount of measurements per day and data size for this and add 8 for a daily rtc.getEpoch() time recording;
+#define FILESIZE 1536        // File size in bytes, to be used. Consider keeping it a multiple of 256 and calculate a minimum of DAILYENTRIES * DATASIZE
 
 #define SPIFFS_SIZE 3145728  //size of the flash memory to be reserved. 3145728 = 3MB
 
@@ -464,8 +464,8 @@ bool storeData() {
     storingbuffer[i * DATASIZE + 7] = (uint16_t)((pressure - 500) * 100);
     storingbuffer[i * DATASIZE + 8] = (uint16_t)(tvoc) >> 8;
     storingbuffer[i * DATASIZE + 9] = (uint16_t)(tvoc);
-    storingbuffer[i * DATASIZE+ 10] = (uint16_t)(co2) >> 8;
-    storingbuffer[i * DATASIZE+ 11] = (uint16_t)(co2);
+    //storingbuffer[i * DATASIZE+ 10] = (uint16_t)(co2) >> 8;
+    //storingbuffer[i * DATASIZE+ 11] = (uint16_t)(co2);
   }
   return true;
 }
@@ -542,7 +542,7 @@ void parseData(uint16_t i, char *ex_string) {
   hr = readingBuffer[i * DATASIZE + 4] << 8 | readingBuffer[i * DATASIZE + 5];
   pr = readingBuffer[i * DATASIZE + 6] << 8 | readingBuffer[i * DATASIZE + 7];
   vcr = readingBuffer[i * DATASIZE + 8] << 8 | readingBuffer[i * DATASIZE + 9];
-  co2r = readingBuffer[i * DATASIZE + 10] << 8 | readingBuffer[i * DATASIZE + 11];
+  //co2r = readingBuffer[i * DATASIZE + 10] << 8 | readingBuffer[i * DATASIZE + 11];
 
   snprintf(row, 64, "%lu;%.2f;%.2f;%.2f;%hu;%hu\r\n", sr * 2, (float)tr / 100, (float)hr / 100, (float)pr / 100 + 500, vcr);
 
@@ -608,7 +608,7 @@ void sendHistory(AsyncWebServerRequest *request) {
       hr = readingBuffer[i * DATASIZE + 4] << 8 | readingBuffer[i * DATASIZE + 5];
       pr = readingBuffer[i * DATASIZE + 6] << 8 | readingBuffer[i * DATASIZE + 7];
       vcr = readingBuffer[i * DATASIZE + 8] << 8 | readingBuffer[i * DATASIZE + 9];
-      co2r = readingBuffer[i*DATASIZE+10] << 8 | readingBuffer[i*DATASIZE+11];
+      //co2r = readingBuffer[i*DATASIZE+10] << 8 | readingBuffer[i*DATASIZE+11];
 
       snprintf(row, 64, "%lu;%.2f;%.2f;%.2f;%hu;%hu\r\n", sr * 2, (float)tr / 100, (float)hr / 100, (float)pr / 100 + 500, vcr, co2r);
       strcpy((char *)buffer, row);
@@ -649,14 +649,14 @@ public:
         Serial.println();
       }
     });
-
+/*
     server.on("/forcestore", HTTP_GET, [](AsyncWebServerRequest *request) {
       request->send_P(200, "text/plain", "last measurement stored to STORAGE");
       Serial.println("Client called the forecestore function. The values to be stored as time, temp, hum, pres and tvoc are:");
 
       //storeData();
     });
-
+*/
     server.on("/history", HTTP_GET, sendHistory);
   }
 
@@ -849,7 +849,7 @@ void loop() {
 
 /////////////////////////////////////////////////////////////////////////////////
 
-
+/*
 
 void listDir(fs::FS &fs, const char *dirname, uint8_t levels) {
   Serial.printf("Listing directory: %s\r\n", dirname);
@@ -1002,3 +1002,5 @@ void testFileIO(fs::FS &fs, const char *path) {
   }
 
 }
+
+*/
