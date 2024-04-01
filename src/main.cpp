@@ -818,6 +818,7 @@ void setup() {
 
 
   WiFi.mode(WIFI_AP);
+  WiFi.setTxPower(WIFI_POWER_11dBm);
   WiFi.softAP("WeatherSpot");
   Serial.println("Starting DNS Server");
   dnsServer.start(53, "*", WiFi.softAPIP());
